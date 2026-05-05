@@ -390,13 +390,7 @@ async function salvarEdicao(e) {
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
-            zoomControl: true,
-            styles: [
-                { elementType: 'geometry',    stylers: [{ color: '#f5f5f5' }] },
-                { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-                { featureType: 'water',       elementType: 'geometry',
-                  stylers: [{ color: '#e0e6ed' }] }
-            ]
+            zoomControl: true
         });
 
         const marker = new google.maps.Marker({
