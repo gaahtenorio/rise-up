@@ -276,6 +276,16 @@ def agencias():
     return render_template('agencias.html', **ctx)
 
 
+@app.route('/detalhes')
+@login_required
+def detalhes_index():
+    """Redireciona para a primeira agência cadastrada."""
+    ag = Agencia.query.order_by(Agencia.nome).first()
+    if ag:
+        return redirect(url_for('detalhes', prefixo=ag.prefixo))
+    abort(404)
+
+
 @app.route('/detalhes/<prefixo>')
 @login_required
 def detalhes(prefixo):

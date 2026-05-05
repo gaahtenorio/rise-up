@@ -4,6 +4,30 @@
 {% block content %}
 <div class="detalhes-wrapper">
 
+    <!-- ============================================================ -->
+    <!-- BARRA DE BUSCA RÁPIDA                                        -->
+    <!-- ============================================================ -->
+    <div class="detalhes-search-bar">
+        <div class="detalhes-search-inner">
+            <i class="fas fa-search detalhes-search-icon"></i>
+            <input
+                type="text"
+                id="detalhes-search-input"
+                class="detalhes-search-input"
+                placeholder="Buscar outra agência por nome, prefixo ou cidade..."
+                autocomplete="off"
+                aria-label="Buscar agência"
+            >
+            <button class="detalhes-search-clear" id="detalhes-search-clear"
+                    style="display:none;" aria-label="Limpar busca">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <!-- Dropdown de resultados -->
+        <ul id="detalhes-search-results" class="detalhes-search-dropdown" role="listbox"
+            style="display:none;"></ul>
+    </div>
+
     <!-- Cabeçalho da agência -->
     <header class="agency-header">
         <div>
@@ -405,6 +429,297 @@ async function salvarEdicao(e) {
                 strokeColor: '#ffffff',
                 strokeWeight: 2.5
             }
+        });
+
+        const iw = new google.maps.InfoWindow({
+            content: '<strong style="font-family:Montserrat,sans-serif;color:#0038A8;">{{ agencia.nome }}</strong>'
+        });
+        marker.addListener('click', () => iw.open(miniMap, marker));
+        iw.open(miniMap, marker);
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+        async defer></script>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================================
+   Barra de busca rápida — detalhes.html
+   ============================================================ */
+.detalhes-search-bar {
+    position: relative;
+    margin-bottom: 24px;
+    z-index: 100;
+}
+
+.detalhes-search-inner {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0 16px;
+    box-shadow: var(--shadow-sm);
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.detalhes-search-inner:focus-within {
+    border-color: var(--bb-blue);
+    box-shadow: 0 0 0 3px rgba(0,56,168,.1);
+}
+
+.detalhes-search-icon {
+    color: var(--text-muted);
+    font-size: .9rem;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.detalhes-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-family: 'Montserrat', sans-serif;
+    font-size: .9rem;
+    color: var(--text-dark);
+    padding: 13px 0;
+    background: transparent;
+}
+
+.detalhes-search-input::placeholder { color: var(--text-muted); }
+
+.detalhes-search-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 50%;
+    transition: color .2s, background .2s;
+    flex-shrink: 0;
+}
+.detalhes-search-clear:hover { color: var(--color-red); background: #fef2f2; }
+
+/* Dropdown */
+.detalhes-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 320px;
+    overflow-y: auto;
+    list-style: none;
+    padding: 6px 0;
+    margin: 0;
+}
+
+.detalhes-search-dropdown li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.detalhes-search-dropdown li:hover,
+.detalhes-search-dropdown li.focused {
+    background: #f0f4ff;
+}
+
+.detalhes-search-dropdown .result-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--bb-blue);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem;
+    flex-shrink: 0;
+}
+.detalhes-search-dropdown .result-icon.reforma { background: #f39c12; }
+.detalhes-search-dropdown .result-icon.fechada { background: var(--color-red); }
+
+.detalhes-search-dropdown .result-info { flex: 1; min-width: 0; }
+.detalhes-search-dropdown .result-nome {
+    font-weight: 600;
+    font-size: .875rem;
+    color: var(--text-dark);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.detalhes-search-dropdown .result-sub {
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+.detalhes-search-dropdown .result-prefixo {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--bb-blue);
+    flex-shrink: 0;
+}
+
+.detalhes-search-dropdown .no-results {
+    padding: 14px 16px;
+    color: var(--text-muted);
+    font-size: .875rem;
+    text-align: center;
+    cursor: default;
+}
+.detalhes-search-dropdown .no-results:hover { background: none; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- ============================================================
+     Busca rápida de agências
+     ============================================================ -->
+<script>
+(function () {
+    const input    = document.getElementById('detalhes-search-input');
+    const dropdown = document.getElementById('detalhes-search-results');
+    const clearBtn = document.getElementById('detalhes-search-clear');
+
+    let debounceTimer = null;
+    let focusedIndex  = -1;
+    let currentItems  = [];
+
+    function iconClass(status) {
+        if (status === 'Em Reforma') return 'reforma';
+        if (status === 'Fechada')    return 'fechada';
+        return '';
+    }
+
+    function renderDropdown(agencias) {
+        currentItems  = agencias;
+        focusedIndex  = -1;
+        dropdown.innerHTML = '';
+
+        if (!agencias.length) {
+            dropdown.innerHTML = '<li class="no-results"><i class="fas fa-search"></i> Nenhuma agência encontrada.</li>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        agencias.forEach((ag, i) => {
+            const li = document.createElement('li');
+            li.setAttribute('role', 'option');
+            li.innerHTML = `
+                <span class="result-icon ${iconClass(ag.status)}">
+                    <i class="fas fa-landmark"></i>
+                </span>
+                <span class="result-info">
+                    <span class="result-nome">${ag.nome}</span>
+                    <span class="result-sub">${ag.municipio} — ${ag.uf} &nbsp;·&nbsp; ${ag.segmento || ''}</span>
+                </span>
+                <span class="result-prefixo">${ag.prefixo}</span>
+            `;
+            li.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // evita blur antes do click
+                window.location.href = '/detalhes/' + ag.prefixo;
+            });
+            dropdown.appendChild(li);
+        });
+
+        dropdown.style.display = 'block';
+    }
+
+    function hideDropdown() {
+        dropdown.style.display = 'none';
+        focusedIndex = -1;
+    }
+
+    function setFocus(index) {
+        const items = dropdown.querySelectorAll('li:not(.no-results)');
+        items.forEach(li => li.classList.remove('focused'));
+        if (index >= 0 && index < items.length) {
+            items[index].classList.add('focused');
+            items[index].scrollIntoView({ block: 'nearest' });
+        }
+        focusedIndex = index;
+    }
+
+    async function buscar(q) {
+        if (!q.trim()) { hideDropdown(); return; }
+        try {
+            const res    = await fetch('/api/agencias?q=' + encodeURIComponent(q));
+            const dados  = await res.json();
+            renderDropdown(dados.slice(0, 8)); // máx 8 resultados
+        } catch(err) {
+            console.error('Erro na busca:', err);
+        }
+    }
+
+    input.addEventListener('input', () => {
+        const q = input.value;
+        clearBtn.style.display = q ? 'block' : 'none';
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => buscar(q), 220);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('li:not(.no-results)');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setFocus(Math.min(focusedIndex + 1, items.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setFocus(Math.max(focusedIndex - 1, 0));
+        } else if (e.key === 'Enter') {
+            if (focusedIndex >= 0 && currentItems[focusedIndex]) {
+                window.location.href = '/detalhes/' + currentItems[focusedIndex].prefixo;
+            }
+        } else if (e.key === 'Escape') {
+            hideDropdown();
+            input.blur();
+        }
+    });
+
+    input.addEventListener('focus', () => {
+        if (input.value.trim()) buscar(input.value);
+    });
+
+    input.addEventListener('blur', () => {
+        // Pequeno delay para permitir o mousedown do item
+        setTimeout(hideDropdown, 150);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        clearBtn.style.display = 'none';
+        hideDropdown();
+        input.focus();
+    });
+
+    // Fecha ao clicar fora
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.detalhes-search-bar')) hideDropdown();
+    });
+})();
+</script>
+
+<!-- Mini-mapa Google Maps -->
+{% if agencia.lat and agencia.lng %}
+<script>
+    function initMiniMap() {
+        const pos = { lat: {{ agencia.lat }}, lng: {{ agencia.lng }} };
+
+        const miniMap = new google.maps.Map(document.getElementById('mini-map'), {
+            center: pos,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: true
+        });
+
+        const marker = new google.maps.Marker({
+            position: pos,
+            map: miniMap,
+            title: '{{ agencia.nome }}'
         });
 
         const iw = new google.maps.InfoWindow({
