@@ -1,25 +1,3 @@
-/* ============================================================
-   Portal DISEC — main.css
-   Arquivo único para todas as páginas (exceto login)
-   Seções:
-     1. Variáveis
-     2. Reset & Base
-     3. Layout (Wrapper, Sidebar, Content)
-     4. Navbar Top
-     5. Main Body & Welcome
-     6. Componentes Compartilhados (Cards, Botões, Badges)
-     7. Página: Index
-     8. Página: Dashboard
-     9. Página: Agências
-    10. Página: Detalhes
-    11. Página: Admin
-    12. Utilitários
-    13. Responsivo
-   ============================================================ */
-
-/* ============================================================
-   1. VARIÁVEIS
-   ============================================================ */
 :root {
     --bb-blue:        #0038A8;
     --bb-blue-dark:   #002d86;
@@ -50,9 +28,6 @@
     --transition:     0.3s ease;
 }
 
-/* ============================================================
-   2. RESET & BASE
-   ============================================================ */
 *, *::before, *::after {
     margin: 0;
     padding: 0;
@@ -72,9 +47,6 @@ ul { list-style: none; }
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; }
 
-/* ============================================================
-   3. LAYOUT — WRAPPER, SIDEBAR, CONTENT
-   ============================================================ */
 .wrapper {
     display: flex;
     width: 100%;
@@ -82,7 +54,6 @@ input, select, textarea { font-family: inherit; }
     min-height: 100vh;
 }
 
-/* --- Sidebar --- */
 #sidebar {
     min-width: var(--sidebar-col-w);
     max-width: var(--sidebar-col-w);
@@ -189,7 +160,6 @@ input, select, textarea { font-family: inherit; }
 
 .nav-item.logout { margin-top: auto; }
 
-/* --- Content area --- */
 #content {
     flex: 1;
     min-width: 0;
@@ -198,9 +168,6 @@ input, select, textarea { font-family: inherit; }
     transition: all var(--transition);
 }
 
-/* ============================================================
-   4. NAVBAR TOP
-   ============================================================ */
 .navbar-top {
     height: var(--navbar-h);
     background: var(--white);
@@ -283,9 +250,6 @@ input, select, textarea { font-family: inherit; }
     flex-shrink: 0;
 }
 
-/* ============================================================
-   5. MAIN BODY & WELCOME
-   ============================================================ */
 .main-body {
     padding: 36px 40px;
     flex: 1;
@@ -308,11 +272,6 @@ input, select, textarea { font-family: inherit; }
     line-height: 1.6;
 }
 
-/* ============================================================
-   6. COMPONENTES COMPARTILHADOS
-   ============================================================ */
-
-/* --- Stat Mini Cards --- */
 .stats-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -371,7 +330,6 @@ input, select, textarea { font-family: inherit; }
     margin-top: 3px;
 }
 
-/* --- Botões --- */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -418,7 +376,6 @@ input, select, textarea { font-family: inherit; }
 
 .btn-ghost:hover { background: #eef2ff; }
 
-/* --- Badges --- */
 .badge {
     display: inline-block;
     padding: 4px 12px;
@@ -434,7 +391,6 @@ input, select, textarea { font-family: inherit; }
 .badge-gestao  { background: #e0e7ff; color: #4338ca; }
 .badge-consulta{ background: #f1f5f9; color: #64748b; }
 
-/* --- Card genérico --- */
 .card {
     background: var(--white);
     border-radius: var(--radius-lg);
@@ -454,12 +410,8 @@ input, select, textarea { font-family: inherit; }
     gap: 10px;
 }
 
-/* --- Separador --- */
 .sep { opacity: 0.35; margin: 0 6px; }
 
-/* ============================================================
-   7. PÁGINA: INDEX
-   ============================================================ */
 .index-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
@@ -526,9 +478,6 @@ input, select, textarea { font-family: inherit; }
     box-shadow: 0 4px 14px rgba(0,56,168,0.22);
 }
 
-/* ============================================================
-   8. PÁGINA: DASHBOARD
-   ============================================================ */
 .dashboard-grid {
     display: grid;
     grid-template-columns: 1.5fr 1fr;
@@ -575,7 +524,6 @@ input, select, textarea { font-family: inherit; }
     overflow: hidden;
 }
 
-/* Ranking de eficiência */
 .efficiency-rank { display: flex; flex-direction: column; gap: 16px; }
 
 .rank-item { display: flex; flex-direction: column; gap: 5px; }
@@ -616,9 +564,6 @@ input, select, textarea { font-family: inherit; }
     height: 200px !important;
 }
 
-/* ============================================================
-   9. PÁGINA: AGÊNCIAS
-   ============================================================ */
 .agencias-wrapper {
     display: flex;
     height: calc(100vh - var(--navbar-h));
@@ -627,7 +572,6 @@ input, select, textarea { font-family: inherit; }
     position: relative;
 }
 
-/* Painel de filtros */
 .filters-panel {
     width: 300px;
     min-width: 300px;
@@ -686,7 +630,6 @@ input, select, textarea { font-family: inherit; }
 
 .filter-select:disabled { background: #f5f5f5; color: #aaa; }
 
-/* Checkboxes customizados */
 .check-list { display: flex; flex-direction: column; gap: 7px; }
 
 .check-item {
@@ -754,7 +697,6 @@ input, select, textarea { font-family: inherit; }
 
 .btn-apply-filters:hover { background: var(--bb-blue-dark); }
 
-/* Botão toggle do painel */
 .panel-toggle-btn {
     position: absolute;
     left: 300px;
@@ -777,7 +719,6 @@ input, select, textarea { font-family: inherit; }
 .panel-toggle-btn.collapsed { left: 0; }
 .panel-toggle-btn:hover { background: var(--bb-blue-dark); }
 
-/* Área de resultados */
 .results-area {
     flex: 1;
     display: flex;
@@ -787,7 +728,6 @@ input, select, textarea { font-family: inherit; }
     overflow: hidden;
 }
 
-/* Barra de busca flutuante */
 .floating-search {
     position: absolute;
     top: 14px;
@@ -832,7 +772,6 @@ input, select, textarea { font-family: inherit; }
 
 .search-bar .btn-search:hover { background: var(--bb-blue-dark); }
 
-/* Toggle mapa/lista */
 .view-toggle {
     position: absolute;
     top: 14px;
@@ -864,7 +803,6 @@ input, select, textarea { font-family: inherit; }
 
 .view-container { width: 100%; height: 100%; }
 
-/* Tabela de resultados */
 .table-container {
     padding: 68px 28px 28px;
     height: 100%;
@@ -903,9 +841,6 @@ input, select, textarea { font-family: inherit; }
 
 .data-table tbody tr:hover td { background: #f8faff; }
 
-/* ============================================================
-   10. PÁGINA: DETALHES
-   ============================================================ */
 .detalhes-wrapper {
     display: flex;
     flex-direction: column;
@@ -936,7 +871,6 @@ input, select, textarea { font-family: inherit; }
 
 .header-actions { display: flex; gap: 10px; flex-shrink: 0; }
 
-/* Mini cards de status */
 .status-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -976,7 +910,6 @@ input, select, textarea { font-family: inherit; }
     font-weight: 700;
 }
 
-/* Layout de duas colunas */
 .details-layout {
     display: grid;
     grid-template-columns: 1.8fr 1.2fr;
@@ -984,7 +917,6 @@ input, select, textarea { font-family: inherit; }
     align-items: start;
 }
 
-/* Tabela de dados técnicos */
 .info-table {
     width: 100%;
     border-collapse: collapse;
@@ -1011,7 +943,6 @@ input, select, textarea { font-family: inherit; }
 
 .info-table tr:last-child td { border-bottom: none; }
 
-/* Recursos ESG */
 .resource-item { margin-bottom: 20px; }
 .resource-item:last-child { margin-bottom: 0; }
 
@@ -1044,7 +975,6 @@ input, select, textarea { font-family: inherit; }
     color: var(--text-muted);
 }
 
-/* Mini mapa */
 .mini-map-box {
     height: 240px;
     background: var(--bg-page);
@@ -1082,7 +1012,6 @@ input, select, textarea { font-family: inherit; }
     flex: 1;
 }
 
-/* Lista de documentos */
 .doc-list { padding: 0; }
 
 .doc-list li { margin-bottom: 10px; }
@@ -1110,9 +1039,6 @@ input, select, textarea { font-family: inherit; }
 
 .text-success { color: var(--color-green); }
 
-/* ============================================================
-   11. PÁGINA: ADMIN
-   ============================================================ */
 .admin-header { margin-bottom: 28px; }
 
 .admin-header h1 {
@@ -1127,7 +1053,6 @@ input, select, textarea { font-family: inherit; }
     font-size: 0.95rem;
 }
 
-/* Tabs */
 .tab-nav {
     display: flex;
     gap: 4px;
@@ -1163,7 +1088,6 @@ input, select, textarea { font-family: inherit; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* Tabela admin */
 .admin-table {
     width: 100%;
     border-collapse: separate;
@@ -1202,7 +1126,6 @@ input, select, textarea { font-family: inherit; }
 
 .admin-table tbody tr:hover td { background: #f8faff; }
 
-/* Botões de ação na tabela */
 .btn-icon {
     width: 36px;
     height: 36px;
@@ -1220,7 +1143,6 @@ input, select, textarea { font-family: inherit; }
 .btn-icon.edit   { background: #f0f7ff; color: var(--bb-blue); }
 .btn-icon.delete { background: #fff1f2; color: var(--color-red); margin-left: 6px; }
 
-/* Formulários admin */
 .form-grid {
     display: grid;
     gap: 20px;
@@ -1278,9 +1200,6 @@ input, select, textarea { font-family: inherit; }
     font-size: 1.1rem;
 }
 
-/* ============================================================
-   12. UTILITÁRIOS
-   ============================================================ */
 .text-muted   { color: var(--text-muted); }
 .text-blue    { color: var(--bb-blue); }
 .text-success { color: var(--color-green); }
@@ -1291,9 +1210,6 @@ input, select, textarea { font-family: inherit; }
 .mt-4         { margin-top: 16px; }
 .mb-4         { margin-bottom: 16px; }
 
-/* ============================================================
-   13. RESPONSIVO
-   ============================================================ */
 @media (max-width: 1200px) {
     .dashboard-grid { grid-template-columns: 1fr; }
     .details-layout { grid-template-columns: 1fr; }
@@ -1343,9 +1259,6 @@ input, select, textarea { font-family: inherit; }
     .tab-btn { padding: 9px 14px; font-size: 0.8rem; }
 }
 
-/* ============================================================
-   14. MODAL
-   ============================================================ */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -1401,9 +1314,6 @@ input, select, textarea { font-family: inherit; }
     padding: 20px 24px 24px;
 }
 
-/* ============================================================
-   15. FORMULÁRIOS (admin / modal)
-   ============================================================ */
 .form-grid.cols-3 {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1420,16 +1330,10 @@ input, select, textarea { font-family: inherit; }
 .form-msg-ok   { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 .form-msg-erro { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
-/* ============================================================
-   16. BADGES EXTRAS
-   ============================================================ */
 .badge-ok      { background: #d4edda; color: #155724; }
 .badge-reforma { background: #fff3cd; color: #856404; }
 .badge-inativo { background: #f8d7da; color: #721c24; }
 
-/* ============================================================
-   17. ADMIN TABLE — search bar inline
-   ============================================================ */
 .admin-card-header .search-bar {
     display: flex;
     align-items: center;
@@ -1451,26 +1355,16 @@ input, select, textarea { font-family: inherit; }
     font-size: .85rem;
 }
 
-/* ============================================================
-   18. RESULTADO COUNT
-   ============================================================ */
 #resultado-count {
     padding: 6px 16px;
     font-size: .82rem;
     color: var(--text-muted);
 }
 
-/* ============================================================
-   19. RESPONSIVO — modais e forms
-   ============================================================ */
 @media (max-width: 768px) {
     .form-grid.cols-3 { grid-template-columns: 1fr; }
     .modal-box { max-width: 100%; }
 }
-
-/* ============================================================
-   20. STAT CARD — alerta (sem geolocalização)
-   ============================================================ */
 .stat-card-alert .stat-icon {
     background: rgba(225, 29, 72, 0.1);
     color: var(--color-red);
