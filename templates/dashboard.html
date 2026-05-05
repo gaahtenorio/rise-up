@@ -1,41 +1,35 @@
 {% extends "base.html" %}
-
-{% block styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-{% endblock %}
+{% block title %}Dashboard | Portal DISEC{% endblock %}
 
 {% block content %}
 <div class="welcome-section">
-    <div class="welcome-text">
-        <h1>Dashboard Estratégico</h1>
-        <p>Acompanhe em tempo real os indicadores de infraestrutura e sustentabilidade do <strong>Portal DISEC</strong>.</p>
-    </div>
+    <h1>Dashboard Estratégico</h1>
+    <p>Acompanhe em tempo real os indicadores de infraestrutura e sustentabilidade do <strong>Portal DISEC</strong>.</p>
 </div>
 
-<div class="dashboard-preview-row mb-4">
-    <div class="stat-mini-card">
+<div class="stats-row">
+    <div class="stat-card">
         <div class="stat-icon yellow"><i class="fas fa-tools"></i></div>
         <div class="stat-data">
             <span class="stat-value">{{ stats.em_reforma if stats else '124' }}</span>
             <span class="stat-label">Agências em Reforma</span>
         </div>
     </div>
-    <div class="stat-mini-card">
+    <div class="stat-card">
         <div class="stat-icon blue"><i class="fas fa-bolt"></i></div>
         <div class="stat-data">
-            <span class="stat-value">1.240 <small style="font-size: 0.6em;">kWh</small></span>
+            <span class="stat-value">1.240 <small style="font-size:.6em">kWh</small></span>
             <span class="stat-label">Consumo Energia (Mês)</span>
         </div>
     </div>
-    <div class="stat-mini-card">
+    <div class="stat-card">
         <div class="stat-icon green"><i class="fas fa-tint"></i></div>
         <div class="stat-data">
-            <span class="stat-value">42 <small style="font-size: 0.6em;">m³</small></span>
+            <span class="stat-value">42 <small style="font-size:.6em">m³</small></span>
             <span class="stat-label">Consumo de Água</span>
         </div>
     </div>
-    <div class="stat-mini-card">
+    <div class="stat-card">
         <div class="stat-icon purple"><i class="fas fa-leaf"></i></div>
         <div class="stat-data">
             <span class="stat-value">94%</span>
@@ -44,129 +38,112 @@
     </div>
 </div>
 
-<div class="main-dashboard-content">
-    <div class="chart-box main-chart">
-        <div class="box-header">
+<div class="dashboard-grid">
+    <!-- Mapa principal -->
+    <div class="chart-box">
+        <div class="chart-box-header">
             <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica de Reformas</h3>
             <p>Visualização de obras prioritárias por região</p>
         </div>
         <div id="map-container" class="map-render"></div>
     </div>
 
+    <!-- Gráficos laterais -->
     <div class="side-charts">
         <div class="chart-box">
-            <div class="box-header">
+            <div class="chart-box-header">
                 <h3>Eficiência Energética</h3>
                 <p>Consumo por Região (Ranking)</p>
             </div>
             <div class="efficiency-rank">
                 <div class="rank-item">
                     <span class="region">Nordeste</span>
-                    <div class="progress-container"><div class="progress-bar bar-100"></div></div>
-                    <span class="value">1.2M</span>
+                    <div class="progress-track"><div class="progress-fill fill-100"></div></div>
+                    <span class="value">1.2M kWh</span>
                 </div>
                 <div class="rank-item">
                     <span class="region">Sudeste</span>
-                    <div class="progress-container"><div class="progress-bar bar-85"></div></div>
-                    <span class="value">2.5M</span>
+                    <div class="progress-track"><div class="progress-fill fill-85"></div></div>
+                    <span class="value">2.5M kWh</span>
                 </div>
                 <div class="rank-item">
                     <span class="region">Sul</span>
-                    <div class="progress-container"><div class="progress-bar bar-70"></div></div>
-                    <span class="value">3.1M</span>
+                    <div class="progress-track"><div class="progress-fill fill-70"></div></div>
+                    <span class="value">3.1M kWh</span>
                 </div>
                 <div class="rank-item">
                     <span class="region">Centro-Oeste</span>
-                    <div class="progress-container"><div class="progress-bar bar-55"></div></div>
-                    <span class="value">4.2M</span>
+                    <div class="progress-track"><div class="progress-fill fill-55"></div></div>
+                    <span class="value">4.2M kWh</span>
                 </div>
             </div>
         </div>
 
         <div class="chart-box">
-            <div class="box-header">
+            <div class="chart-box-header">
                 <h3>Tendência Global</h3>
                 <p>Evolução do consumo (Últimos 4 meses)</p>
             </div>
-            <canvas id="trendChart" class="chart-render"></canvas>
+            <canvas id="trendChart" class="chart-canvas"></canvas>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDTorh_pI90GOChvWBnurYW6W0Dbcixuwg&callback=initMap&libraries=places,marker" async defer></script>
-
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&libraries=places,marker" async defer></script>
 <script>
-    async function initMap() {
-        const { Map } = await google.maps.importLibrary("maps");
-        const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+async function initMap() {
+    const { Map } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
 
-        const brasilCentro = { lat: -14.2350, lng: -51.9253 };
-        
-        const mapStyle = [
-            { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-            { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-            { "featureType": "administrative.country", "elementType": "geometry.stroke", "stylers": [{ "color": "#0038A8" }, { "weight": 1 }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e6ed" }] }
-        ];
-
-        const map = new Map(document.getElementById("map-container"), {
-            zoom: 4,
-            center: brasilCentro,
-            styles: mapStyle,
-            disableDefaultUI: true,
-            mapId: "DISEC_DASHBOARD_MAP" 
-        });
-
-        const locais = [
-            { pos: { lat: -8.0578, lng: -34.8829 }, label: "15", nome: "Recife - Superintendência" },
-            { pos: { lat: -23.5505, lng: -46.6333 }, label: "22", nome: "São Paulo - Polo Operacional" },
-            { pos: { lat: -15.7942, lng: -47.8822 }, label: "08", nome: "Brasília - Sede" }
-        ];
-
-        locais.forEach(local => {
-            const pinCustomizado = new PinElement({
-                background: "#0038A8",
-                glyph: local.label,
-                glyphColor: "white",
-                borderColor: "white",
-            });
-
-            new AdvancedMarkerElement({
-                position: local.pos,
-                map: map,
-                content: pinCustomizado.element,
-                title: local.nome
-            });
-        });
-    }
-
-    // Gráfico de Tendência
-    const ctx = document.getElementById('trendChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ['Jan', 'Fev', 'Mar', 'Abr'],
-            datasets: [{
-                label: 'Consumo Global',
-                data: [1300, 1250, 1280, 1240],
-                borderColor: '#0038A8',
-                backgroundColor: 'rgba(0, 56, 168, 0.1)',
-                fill: true,
-                tension: 0.4,
-                pointRadius: 4,
-                borderWidth: 3
-            }]
-        },
-        options: { 
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { 
-                y: { display: false },
-                x: { grid: { display: false } }
-            }
-        }
+    const map = new Map(document.getElementById("map-container"), {
+        zoom: 4,
+        center: { lat: -14.235, lng: -51.925 },
+        styles: [
+            { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+            { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            { featureType: "administrative.country", elementType: "geometry.stroke",
+              stylers: [{ color: "#0038A8" }, { weight: 1 }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#e0e6ed" }] }
+        ],
+        disableDefaultUI: true,
+        mapId: "DISEC_DASHBOARD_MAP"
     });
+
+    [
+        { pos: { lat: -8.0578,  lng: -34.8829 }, label: "15", nome: "Recife — Superintendência" },
+        { pos: { lat: -23.5505, lng: -46.6333 }, label: "22", nome: "São Paulo — Polo Operacional" },
+        { pos: { lat: -15.7942, lng: -47.8822 }, label: "08", nome: "Brasília — Sede" }
+    ].forEach(local => {
+        const pin = new PinElement({
+            background: "#0038A8", glyph: local.label,
+            glyphColor: "white", borderColor: "white"
+        });
+        new AdvancedMarkerElement({ position: local.pos, map, content: pin.element, title: local.nome });
+    });
+}
+
+const ctx = document.getElementById('trendChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['Jan', 'Fev', 'Mar', 'Abr'],
+        datasets: [{
+            label: 'Consumo Global',
+            data: [1300, 1250, 1280, 1240],
+            borderColor: '#0038A8',
+            backgroundColor: 'rgba(0,56,168,0.08)',
+            fill: true, tension: 0.4, pointRadius: 4, borderWidth: 3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { display: false }, x: { grid: { display: false } } }
+    }
+});
 </script>
 {% endblock %}

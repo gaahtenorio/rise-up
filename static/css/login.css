@@ -1,75 +1,85 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+/* ============================================================
+   Portal DISEC — login.css
+   Página de login (standalone, não usa base.html)
+   Variáveis espelham as de main.css para consistência visual.
+   ============================================================ */
+:root {
+    --bb-blue:      #0038A8;
+    --bb-blue-dark: #002d86;
+    --bb-yellow:    #FCF000;
+    --white:        #FFFFFF;
 }
 
-:root {
-    --bb-yellow: #FCF800;
-    --bb-blue: #1d3595;
-    --bb-blue-dark: #162a7a;
-    --bb-blue-light: #4667EE;
-    --bg-page: #F4F6F8;
-    --white: #FFFFFF;
+*, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
 }
 
 body.login-page {
     font-family: 'Montserrat', sans-serif;
     background-color: var(--bb-blue);
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding: 20px;
+    -webkit-font-smoothing: antialiased;
 }
 
 .login-wrapper {
     width: 100%;
     max-width: 400px;
-    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
 }
 
 .login-card {
-    background-color: var(--bb-yellow);
+    background: var(--bb-yellow);
     width: 100%;
-    padding: 45px 35px;
+    padding: 44px 36px;
     border-radius: 20px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.35);
     text-align: center;
 }
 
 .login-logo {
-    width: 130px;
+    width: 120px;
     height: auto;
-    margin-bottom: 20px;
-    filter: drop-shadow(0px 2px 2px rgba(29, 53, 149, 0.2));
+    margin-bottom: 18px;
 }
 
 .portal-title {
     color: var(--bb-blue);
-    font-size: 1.8rem;
+    font-size: 1.75rem;
     font-weight: 800;
-    margin-bottom: 5px;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
 }
 
-.subtitle {
+.login-subtitle {
     color: var(--bb-blue);
+    font-size: 0.9rem;
     font-weight: 400;
-    font-size: 0.95rem;
-    margin-bottom: 35px;
+    margin-bottom: 32px;
+    opacity: 0.8;
 }
 
+/* Campos */
 .input-group {
     text-align: left;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .input-group label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 700;
     color: var(--bb-blue);
     margin-bottom: 6px;
-    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
 .input-field {
@@ -80,134 +90,101 @@ body.login-page {
 
 .input-field i {
     position: absolute;
-    left: 15px;
+    left: 14px;
     color: var(--bb-blue);
-    z-index: 1;
+    font-size: 0.9rem;
+    pointer-events: none;
 }
 
 .input-field input {
     width: 100%;
-    padding: 14px 14px 14px 45px;
-    background-color: rgba(255, 255, 255, 0.3);
+    padding: 13px 14px 13px 42px;
+    background: rgba(255,255,255,0.35);
     border: 2px solid transparent;
     border-radius: 10px;
-    outline: none;
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: var(--bb-blue);
     font-family: 'Montserrat', sans-serif;
-    transition: all 0.2s ease;
+    outline: none;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.input-field input::placeholder {
-    color: rgba(29, 53, 149, 0.5);
-}
+.input-field input::placeholder { color: rgba(0,56,168,0.45); }
 
 .input-field input:focus {
-    background-color: var(--white); 
+    background: var(--white);
     border-color: var(--bb-blue);
-    box-shadow: 0 4px 8px rgba(0, 56, 168, 0.1);
+    box-shadow: 0 0 0 4px rgba(0,56,168,0.12);
 }
 
+/* Links */
 .login-options {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 8px;
-    margin-bottom: 25px;
+    margin-bottom: 24px;
 }
 
 .option-link {
     color: var(--bb-blue);
-    text-decoration: none;
     font-size: 0.75rem;
     font-weight: 600;
-    transition: color 0.2s;
+    text-decoration: none;
+    transition: opacity 0.2s;
 }
 
-.option-link:hover {
-    text-decoration: underline;
-    color: var(--bb-blue-dark);
-}
+.option-link:hover { opacity: 0.7; text-decoration: underline; }
 
-.separator {
+.login-sep {
     color: var(--bb-blue);
+    opacity: 0.3;
     font-size: 0.75rem;
-    opacity: 0.4;
     user-select: none;
 }
 
+/* Botão */
 .btn-login {
     width: 100%;
-    padding: 16px;
-    background-color: var(--bb-blue); 
-    color: var(--bb-yellow); 
+    padding: 15px;
+    background: var(--bb-blue);
+    color: var(--bb-yellow);
     border: none;
-    border-radius: 30px;
-    font-size: 1.1rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 800;
     letter-spacing: 1.5px;
     text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .btn-login:hover {
-    background-color: var(--bb-blue-dark);
+    background: var(--bb-blue-dark);
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
 }
 
+/* Mensagem de erro */
 .error-msg {
-    color: #d93025;
-    font-size: 0.85rem;
-    margin-top: 15px;
+    color: #c0392b;
+    font-size: 0.82rem;
     font-weight: 700;
+    margin-top: 14px;
     display: none;
 }
 
+/* Rodapé */
 .login-footer {
-    margin-top: 25px;
-    color: var(--white);
-    font-size: 0.75rem;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.72rem;
     text-align: center;
-    opacity: 0.8;
 }
 
+/* Responsivo */
 @media (max-width: 480px) {
-    body.login-page {
-        align-items: flex-start;
-        padding-top: 40px;
-    }
-
-    .login-wrapper {
-        max-width: 100%;
-        padding: 15px;
-    }
-
-    .login-card {
-        padding: 30px 20px;
-    }
-
-    .portal-title {
-        font-size: 1.5rem;
-    }
-
-    .subtitle {
-        font-size: 0.85rem;
-        margin-bottom: 25px;
-    }
-
-    .login-options {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .separator {
-        display: none;
-    }
-
-    .btn-login {
-        font-size: 1rem;
-        padding: 14px;
-    }
+    .login-card { padding: 30px 22px; }
+    .portal-title { font-size: 1.5rem; }
+    .login-options { flex-direction: column; gap: 10px; }
+    .login-sep { display: none; }
 }

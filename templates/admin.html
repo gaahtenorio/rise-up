@@ -1,129 +1,140 @@
 {% extends "base.html" %}
-
-{% block styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
-{% endblock %}
+{% block title %}Gestão DISEC | Portal DISEC{% endblock %}
 
 {% block content %}
-<div class="container-fluid admin-container">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="page-title">Painel Administrativo</h1>
-            <p class="page-subtitle">Gestão de acessos, unidades e indicadores estratégicos do <strong>Portal DISEC</strong>.</p>
-        </div>
-    </div>
+<div class="admin-header">
+    <h1>Painel Administrativo</h1>
+    <p>Gestão de acessos, unidades e indicadores estratégicos do <strong>Portal DISEC</strong>.</p>
+</div>
 
-    <div class="row mb-4">
-        <div class="col-12">
-            <ul class="nav nav-pills bb-nav-pills" id="adminTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="users-tab" data-bs-toggle="pill" data-bs-target="#users-content" type="button" role="tab">
-                        <i class="fas fa-users-cog me-2"></i>Usuários
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="agencies-tab" data-bs-toggle="pill" data-bs-target="#agencies-content" type="button" role="tab">
-                        <i class="fas fa-landmark me-2"></i>Agências
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="indicators-tab" data-bs-toggle="pill" data-bs-target="#indicators-content" type="button" role="tab">
-                        <i class="fas fa-leaf me-2"></i>Indicadores & ESG
-                    </button>
-                </li>
-            </ul>
-        </div>
-    </div>
+<!-- Tabs de navegação -->
+<div class="tab-nav" role="tablist">
+    <button class="tab-btn active" role="tab" aria-selected="true"
+            onclick="switchTab('users', this)">
+        <i class="fas fa-users-cog"></i> Usuários
+    </button>
+    <button class="tab-btn" role="tab" aria-selected="false"
+            onclick="switchTab('agencies', this)">
+        <i class="fas fa-landmark"></i> Agências
+    </button>
+    <button class="tab-btn" role="tab" aria-selected="false"
+            onclick="switchTab('indicators', this)">
+        <i class="fas fa-leaf"></i> Indicadores & ESG
+    </button>
+</div>
 
-    <div class="tab-content" id="adminTabsContent">
-        
-        <div class="tab-pane fade show active" id="users-content" role="tabpanel">
-            <div class="bb-card">
-                <div class="card-header-flex">
-                    <h4 class="card-inner-title">Controle de Acessos</h4>
-                    <button class="btn btn-bb-primary">
-                        <i class="fas fa-plus me-2"></i>Novo Usuário
-                    </button>
-                </div>
-                <p class="text-muted mb-4">Gerencie colaboradores e níveis de permissão do sistema.</p>
-                
-                <div class="table-responsive">
-                    <table class="table bb-table">
-                        <thead>
-                            <tr>
-                                <th>Colaborador</th>
-                                <th>E-mail Corporativo</th>
-                                <th>Perfil</th>
-                                <th class="text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="fw-bold">Igor Barbosa</td>
-                                <td class="text-secondary">igor@bb.com.br</td>
-                                <td><span class="badge-profile profile-gestao">GESTÃO</span></td>
-                                <td class="text-center">
-                                    <button class="btn btn-action edit"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-action delete"><i class="fas fa-trash-alt"></i></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Mauricio</td>
-                                <td class="text-secondary">mauricio@bb.com.br</td>
-                                <td><span class="badge-profile profile-consulta">CONSULTA</span></td>
-                                <td class="text-center">
-                                    <button class="btn btn-action edit"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-action delete"><i class="fas fa-trash-alt"></i></button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<!-- Painel: Usuários -->
+<div class="tab-panel active" id="tab-users">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Controle de Acessos</span>
+            <button class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Usuário
+            </button>
         </div>
+        <p class="text-muted mb-4">Gerencie colaboradores e níveis de permissão do sistema.</p>
 
-        <div class="tab-pane fade" id="agencies-content" role="tabpanel">
-            <div class="bb-card">
-                <h4 class="card-inner-title mb-4">Cadastrar / Editar Unidade</h4>
-                <form class="row g-4">
-                    <div class="col-md-3">
-                        <label class="bb-form-label">Prefixo</label>
-                        <input type="text" class="form-control bb-input" placeholder="Ex: 4211">
-                    </div>
-                    <div class="col-md-9">
-                        <label class="bb-form-label">Nome da Agência</label>
-                        <input type="text" class="form-control bb-input" placeholder="Ex: Agência Recife Centro">
-                    </div>
-                    <div class="col-12">
-                        <label class="bb-form-label">Endereço Completo</label>
-                        <input type="text" class="form-control bb-input" placeholder="Rua, Número, Bairro, Cidade - UF">
-                    </div>
-                    <div class="col-12 text-end">
-                        <button type="submit" class="btn btn-bb-primary px-5">Salvar Unidade</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="indicators-content" role="tabpanel">
-            <div class="bb-card">
-                <h4 class="card-inner-title mb-4">Metas Estratégicas Globais</h4>
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <label class="bb-form-label">Agências em Reforma (Total)</label>
-                        <input type="number" class="form-control bb-input" value="124">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="bb-form-label">Meta ESG Alcançada (%)</label>
-                        <input type="number" class="form-control bb-input" value="94">
-                    </div>
-                    <div class="col-12 text-end">
-                        <button class="btn btn-bb-primary px-5">Atualizar Portal</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Colaborador</th>
+                    <th>E-mail Corporativo</th>
+                    <th>Perfil</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="fw-bold">Igor Barbosa</td>
+                    <td class="text-muted">igor@bb.com.br</td>
+                    <td><span class="badge badge-gestao">GESTÃO</span></td>
+                    <td class="text-center">
+                        <button class="btn-icon edit" aria-label="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon delete" aria-label="Excluir"><i class="fas fa-trash-alt"></i></button>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold">Mauricio</td>
+                    <td class="text-muted">mauricio@bb.com.br</td>
+                    <td><span class="badge badge-consulta">CONSULTA</span></td>
+                    <td class="text-center">
+                        <button class="btn-icon edit" aria-label="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon delete" aria-label="Excluir"><i class="fas fa-trash-alt"></i></button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
+
+<!-- Painel: Agências -->
+<div class="tab-panel" id="tab-agencies">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Cadastrar / Editar Unidade</span>
+        </div>
+        <form onsubmit="return false;">
+            <div class="form-grid cols-4-8">
+                <div class="form-group">
+                    <label class="form-label">Prefixo</label>
+                    <input type="text" class="form-input" placeholder="Ex: 4211">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome da Agência</label>
+                    <input type="text" class="form-input" placeholder="Ex: Agência Recife Centro">
+                </div>
+            </div>
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Endereço Completo</label>
+                    <input type="text" class="form-input" placeholder="Rua, Número, Bairro, Cidade — UF">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" style="padding:12px 40px;">
+                    Salvar Unidade
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Painel: Indicadores -->
+<div class="tab-panel" id="tab-indicators">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Metas Estratégicas Globais</span>
+        </div>
+        <form onsubmit="return false;">
+            <div class="form-grid cols-2">
+                <div class="form-group">
+                    <label class="form-label">Agências em Reforma (Total)</label>
+                    <input type="number" class="form-input" value="124">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Meta ESG Alcançada (%)</label>
+                    <input type="number" class="form-input" value="94">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" style="padding:12px 40px;">
+                    Atualizar Portal
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
+    document.getElementById('tab-' + tabId).classList.add('active');
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+}
+</script>
 {% endblock %}

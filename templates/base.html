@@ -4,97 +4,108 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Portal DISEC{% endblock %}</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    
-    {% block styles %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <div class="wrapper">
-        <nav id="sidebar">
-            <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='assets/img/bb-logo.png') }}" alt="Logo BB" class="logo-bb">
-                <span class="brand-text">Portal DISEC</span>
+<div class="wrapper">
+
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <img src="{{ url_for('static', filename='assets/img/bb-logo.png') }}" alt="Logo BB" class="logo-bb">
+            <span class="brand-text">Portal DISEC</span>
+        </div>
+
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="{{ url_for('index') }}">
+                    <i class="fas fa-home"></i>
+                    <span class="link-text">Início</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-chart-line"></i>
+                    <span class="link-text">Dashboard Geral</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('agencias') }}">
+                    <i class="fas fa-search-location"></i>
+                    <span class="link-text">Consulta Nacional</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('detalhes', prefixo='0001') }}">
+                    <i class="fas fa-info-circle"></i>
+                    <span class="link-text">Informações Técnicas</span>
+                </a>
+            </li>
+            {% if user_level == 'Gestão' %}
+            <li class="nav-item admin-section">
+                <a href="{{ url_for('admin') }}">
+                    <i class="fas fa-user-shield"></i>
+                    <span class="link-text">Gestão DISEC</span>
+                </a>
+            </li>
+            {% endif %}
+            <li class="nav-item logout">
+                <a href="{{ url_for('logout') }}">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span class="link-text">Sair</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Content -->
+    <div id="content">
+        <nav class="navbar-top">
+            <div class="left-nav">
+                <button class="menu-toggle" id="sidebarCollapse" aria-label="Expandir menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h4 class="current-page-name">
+                    {% block page_name %}{{ page_title if page_title else "Início" }}{% endblock %}
+                </h4>
             </div>
-
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <a href="{{ url_for('index') }}"><i class="fas fa-home"></i> <span class="link-text">Início</span></a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{{ url_for('dashboard') }}"><i class="fas fa-chart-line"></i> <span class="link-text">Dashboard Geral</span></a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{{ url_for('agencias') }}"><i class="fas fa-search-location"></i> <span class="link-text">Consulta Nacional</span></a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{{ url_for('detalhes', prefixo='0001') }}"><i class="fas fa-info-circle"></i> <span class="link-text">Informações Técnicas</span></a>
-                </li>
-                
-                {% if user_level == 'Gestão' %}
-                <li class="nav-item admin-section">
-                    <a href="{{ url_for('admin') }}"><i class="fas fa-user-shield"></i> <span class="link-text">Gestão DISEC</span></a>
-                </li>
-                {% endif %}
-
-                <li class="nav-item logout">
-                    <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> <span class="link-text">Sair</span></a>
-                </li>
-            </ul>
+            <div class="user-controls">
+                <div class="user-details">
+                    <span class="user-name">{{ user_name }}</span>
+                    <small class="user-role">{{ user_level }}</small>
+                </div>
+                <div class="user-avatar" aria-hidden="true">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
         </nav>
 
-        <div id="content">
-            <nav class="navbar-top">
-                <div class="left-nav">
-                    <button type="button" class="menu-toggle" id="sidebarCollapse">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="page-info">
-                        <h4 class="current-page-name">{% block page_name %}{{ page_title if page_title else "Página Inicial" }}{% endblock %}</h4>
-                    </div>
-                </div>
-                
-                <div class="user-controls">
-                    <div class="user-details">
-                        <span class="user-name">{{ user_name }}</span>
-                        <small class="user-role">{{ user_level }}</small>
-                    </div>
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                </div>
-            </nav>
-
-            <main class="main-body">
-                {% block content %}{% endblock %}
-            </main>
-        </div>
+        <main class="main-body">
+            {% block content %}{% endblock %}
+        </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
-    <script>
-        document.querySelectorAll('.nav-menu .nav-item a').forEach(link => {
-            const currentPath = window.location.pathname;
-            const linkPath = link.getAttribute('href');
+</div>
 
-            if (linkPath === currentPath) {
-                link.parentElement.classList.add('active');
-            } else if (linkPath !== '/' && currentPath.startsWith(linkPath)) {
-                link.parentElement.classList.add('active');
-            } else {
-                link.parentElement.classList.remove('active');
-            }
-        });
-    </script>
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    {% block extra_js %}{% endblock %}
+<script>
+    // Marca o item ativo na sidebar
+    document.querySelectorAll('.nav-menu .nav-item a').forEach(link => {
+        const current = window.location.pathname;
+        const href    = link.getAttribute('href');
+        if (href === current || (href !== '/' && current.startsWith(href))) {
+            link.parentElement.classList.add('active');
+        }
+    });
+</script>
+
+{% block extra_js %}{% endblock %}
 </body>
 </html>

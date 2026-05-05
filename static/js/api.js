@@ -1,35 +1,41 @@
-const API_CONFIG = {
-    localPath: 'data/agencias.json',
-    bcbEndpoint: 'https://olinda.bcb.gov.br/olinda/servico/Informes_Agencias/versao/v1/odata/Agencias'
-};
-
 /**
- * @param {string} filter
+ * Busca agências no endpoint interno do servidor.
+ * @param {string} filtro - Texto livre (nome, prefixo ou cidade)
+ * @param {string} uf     - Sigla do estado (ex: "PE")
+ * @returns {Promise<Array>}
  */
-async function getAgencias(filter = '') {
+async function getAgencias(filtro = '', uf = '') {
     try {
-        const response = await fetch(API_CONFIG.localPath);
-        
+        const params = new URLSearchParams();
+        if (filtro) params.append('q', filtro);
+        if (uf)     params.append('uf', uf);
+
+        const url = '/api/agencias' + (params.toString() ? '?' + params.toString() : '');
+        const response = await fetch(url);
+
         if (!response.ok) {
-            throw new Error('Não foi possível carregar os dados das agências.');
+            throw new Error(`Erro ao carregar agências: ${response.status}`);
         }
 
-        const data = await response.json();
-
-        if (filter) {
-            return data.filter(ag => 
-                ag.municipio.toLowerCase().includes(filter.toLowerCase()) || 
-                ag.uf.toLowerCase() === filter.toLowerCase()
-            );
-        }
-
-        return data;
+        return await response.json();
     } catch (error) {
-        console.error("Erro na API:", error);
+        console.error('Erro na API:', error);
         return [];
     }
 }
 
+/**
+ * Formata o endereço completo de uma agência.
+ * @param {Object} agencia
+ * @returns {string}
+ */
 function formatAddress(agencia) {
-    return `${agencia.logradouro}, ${agencia.numero} - ${agencia.bairro}, ${agencia.municipio} - ${agencia.uf}`;
+    const partes = [
+        agencia.logradouro,
+        agencia.numero,
+        agencia.bairro ? `- ${agencia.bairro}` : '',
+        agencia.municipio,
+        agencia.uf ? `- ${agencia.uf}` : ''
+    ].filter(Boolean);
+    return partes.join(', ');
 }

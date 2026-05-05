@@ -1,26 +1,33 @@
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
 
+    // ------------------------------------------------------------------
+    // Sidebar toggle
+    // ------------------------------------------------------------------
     const menuToggle = document.getElementById('sidebarCollapse');
     const sidebar = document.querySelector('#sidebar');
     const content = document.querySelector('#content');
 
     if (menuToggle && sidebar && content) {
-        menuToggle.addEventListener('click', function() {
+        menuToggle.addEventListener('click', function () {
             sidebar.classList.toggle('active');
             content.classList.toggle('active');
 
-            if (typeof map !== 'undefined') {
-                setTimeout(() => { map.invalidateSize(); }, 300);
+            // Atualiza o mapa Leaflet se estiver presente
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                setTimeout(() => map.invalidateSize(), 300);
             }
         });
     }
 
+    // ------------------------------------------------------------------
+    // Busca de agências (página /agencias)
+    // ------------------------------------------------------------------
     const searchInput = document.getElementById('searchInput');
-    const searchBtn = document.getElementById('searchBtn');
+    const searchBtn   = document.getElementById('searchBtn');
     const agenciasGrid = document.getElementById('agencias-grid');
 
     if (searchBtn && searchInput) {
-        
+
         async function buscarAgencias() {
             const termoBusca = searchInput.value.trim();
             if (!agenciasGrid) return;
@@ -32,7 +39,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 renderizarInterface(agencias);
             } catch (error) {
                 agenciasGrid.innerHTML = '<p class="error">Erro ao conectar com a base de dados.</p>';
-                console.error("Erro na busca:", error);
+                console.error('Erro na busca:', error);
             }
         }
 
@@ -46,12 +53,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             agencias.forEach(agencia => {
-                const infoPopup = `
-                    <strong>${agencia.nome}</strong><br>
-                    ${agencia.endereco || 'Endereço não informado'}
-                `;
+                const endereco = agencia.endereco || formatAddress(agencia) || 'Endereço não informado';
+                const infoPopup = `<strong>${agencia.nome}</strong><br>${endereco}`;
 
-                if (typeof addAgencyMarker === 'function') {
+                if (typeof addAgencyMarker === 'function' && agencia.lat && agencia.lng) {
                     addAgencyMarker(agencia.lat, agencia.lng, infoPopup);
                 }
 
@@ -60,10 +65,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 card.innerHTML = `
                     <h3>${agencia.nome}</h3>
                     <p><strong>Prefixo:</strong> ${agencia.prefixo}</p>
-                    <p><i class="fas fa-map-marker-alt"></i> ${agencia.endereco || 'Consultar base'}</p>
+                    <p><i class="fas fa-map-marker-alt"></i> ${endereco}</p>
+                    <a href="/detalhes/${agencia.prefixo}" class="btn-action">
+                        Ver Detalhes
+                    </a>
+                    ${agencia.lat && agencia.lng ? `
                     <button class="btn-action" onclick="focarNoMapa(${agencia.lat}, ${agencia.lng})">
                         Ver no Mapa
-                    </button>
+                    </button>` : ''}
                 `;
                 agenciasGrid.appendChild(card);
             });
@@ -76,8 +85,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
+// ------------------------------------------------------------------
+// Foca o mapa Leaflet em uma coordenada
+// ------------------------------------------------------------------
 function focarNoMapa(lat, lng) {
-    if (typeof map !== 'undefined') {
+    if (typeof map !== 'undefined' && map && typeof map.setView === 'function') {
         map.setView([lat, lng], 15);
     }
 }
