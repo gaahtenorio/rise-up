@@ -1342,3 +1342,128 @@ input, select, textarea { font-family: inherit; }
 
     .tab-btn { padding: 9px 14px; font-size: 0.8rem; }
 }
+
+/* ============================================================
+   14. MODAL
+   ============================================================ */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-box {
+    background: var(--white);
+    border-radius: var(--radius-md);
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-lg);
+    animation: modalIn .2s ease;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color var(--transition);
+}
+.modal-close:hover { color: var(--color-red); }
+
+.modal-box form {
+    padding: 20px 24px 24px;
+}
+
+/* ============================================================
+   15. FORMULÁRIOS (admin / modal)
+   ============================================================ */
+.form-grid.cols-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.form-msg {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: .875rem;
+    font-weight: 500;
+    margin-top: 12px;
+}
+.form-msg-ok   { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.form-msg-erro { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+/* ============================================================
+   16. BADGES EXTRAS
+   ============================================================ */
+.badge-ok      { background: #d4edda; color: #155724; }
+.badge-reforma { background: #fff3cd; color: #856404; }
+.badge-inativo { background: #f8d7da; color: #721c24; }
+
+/* ============================================================
+   17. ADMIN TABLE — search bar inline
+   ============================================================ */
+.admin-card-header .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-page);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+}
+.admin-card-header .search-bar input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: .875rem;
+    width: 200px;
+}
+.admin-card-header .search-bar i {
+    color: var(--text-muted);
+    font-size: .85rem;
+}
+
+/* ============================================================
+   18. RESULTADO COUNT
+   ============================================================ */
+#resultado-count {
+    padding: 6px 16px;
+    font-size: .82rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================
+   19. RESPONSIVO — modais e forms
+   ============================================================ */
+@media (max-width: 768px) {
+    .form-grid.cols-3 { grid-template-columns: 1fr; }
+    .modal-box { max-width: 100%; }
+}

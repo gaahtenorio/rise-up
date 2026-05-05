@@ -32,20 +32,24 @@
             <label class="filter-label"><i class="fas fa-layer-group"></i> Segmento / Tipo</label>
             <div class="check-list">
                 <label class="check-item">
-                    <input type="checkbox" value="varejo" checked>
+                    <input type="checkbox" value="Varejo" checked>
                     <span class="check-box accent-blue"></span> Varejo (PF)
                 </label>
                 <label class="check-item">
-                    <input type="checkbox" value="pj" checked>
+                    <input type="checkbox" value="Empresa" checked>
                     <span class="check-box accent-black"></span> Empresa (PJ)
                 </label>
                 <label class="check-item">
-                    <input type="checkbox" value="agro" checked>
+                    <input type="checkbox" value="Agronegócio" checked>
                     <span class="check-box accent-green"></span> Agronegócio
                 </label>
                 <label class="check-item">
-                    <input type="checkbox" value="estilo" checked>
+                    <input type="checkbox" value="Estilo" checked>
                     <span class="check-box accent-purple"></span> Estilo / Alta Renda
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Governo" checked>
+                    <span class="check-box accent-info"></span> Governo
                 </label>
             </div>
         </div>
@@ -54,17 +58,21 @@
             <label class="filter-label"><i class="fas fa-tools"></i> Status Infra</label>
             <div class="check-list">
                 <label class="check-item">
-                    <input type="checkbox" value="normal" checked>
+                    <input type="checkbox" value="Operação Normal" checked>
                     <span class="check-box accent-info"></span> Operação Normal
                 </label>
                 <label class="check-item">
-                    <input type="checkbox" value="reforma">
+                    <input type="checkbox" value="Em Reforma" checked>
                     <span class="check-box accent-yellow"></span> Em Reforma
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Fechada" checked>
+                    <span class="check-box accent-red"></span> Fechada
                 </label>
             </div>
         </div>
 
-        <button class="btn-apply-filters" id="btn-aplicar-filtros">
+        <button class="btn-apply-filters" id="btn-aplicar-filtros" onclick="buscarAgencias()">
             <i class="fas fa-filter"></i> Aplicar Filtros
         </button>
     </aside>
@@ -80,7 +88,7 @@
             <div class="search-bar">
                 <i class="fas fa-search"></i>
                 <input type="text" id="search-input" placeholder="Pesquisar por nome, prefixo ou cidade...">
-                <button class="btn-search" id="searchBtn">Buscar</button>
+                <button class="btn-search" id="searchBtn" onclick="buscarAgencias()">Buscar</button>
             </div>
         </div>
 
@@ -93,8 +101,10 @@
             </button>
         </div>
 
+        <div id="resultado-count" style="padding:8px 16px;font-size:.85rem;color:var(--text-muted);"></div>
+
         <div id="map-view" class="view-container">
-            <div id="google-map" style="width:100%;height:100%;"></div>
+            <div id="google-map-agencias" style="width:100%;height:100%;"></div>
         </div>
 
         <div id="list-view" class="view-container" style="display:none;">
@@ -110,7 +120,9 @@
                             <th>Ação</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body"></tbody>
+                    <tbody id="table-body">
+                        <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -119,12 +131,15 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&libraries=places" async defer></script>
 <script>
-    let map;
-    const filtersPanel = document.getElementById('filters-panel');
-    const toggleBtn    = document.getElementById('toggle-filters');
-    const toggleIcon   = toggleBtn.querySelector('i');
+    /* ------------------------------------------------------------------ */
+    /* Estado global                                                        */
+    /* ------------------------------------------------------------------ */
+    let gMap;
+    let gMarkers   = [];
+    let infoWindow = null;
+
+    const GMAPS_KEY = '{{ google_maps_key }}';
 
     const estadosPorRegiao = {
         'Norte':        ['AC','AM','AP','PA','RO','RR','TO'],
@@ -134,17 +149,178 @@
         'Sul':          ['PR','RS','SC']
     };
 
+    /* ------------------------------------------------------------------ */
+    /* Inicialização do Google Maps                                         */
+    /* ------------------------------------------------------------------ */
     function initMap() {
-        map = new google.maps.Map(document.getElementById("google-map"), {
-            center: { lat: -15.793889, lng: -47.882778 },
+        gMap = new google.maps.Map(document.getElementById('google-map-agencias'), {
+            center: { lat: -14.235, lng: -51.925 },
             zoom: 4,
-            zoomControl: true,
             mapTypeControl: false,
             streetViewControl: false,
-            fullscreenControl: false
+            fullscreenControl: true,
+            styles: [
+                { elementType: 'geometry',      stylers: [{ color: '#f5f5f5' }] },
+                { elementType: 'labels.icon',   stylers: [{ visibility: 'off' }] },
+                { featureType: 'water',         elementType: 'geometry', stylers: [{ color: '#e0e6ed' }] },
+                { featureType: 'administrative.country', elementType: 'geometry.stroke',
+                  stylers: [{ color: '#0038A8' }, { weight: 1 }] }
+            ]
         });
+
+        infoWindow = new google.maps.InfoWindow();
+
+        // Busca inicial após mapa pronto
+        buscarAgencias();
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Marcadores                                                           */
+    /* ------------------------------------------------------------------ */
+    function limparMarcadores() {
+        gMarkers.forEach(m => m.setMap(null));
+        gMarkers = [];
+    }
+
+    function corPorStatus(status) {
+        if (status === 'Em Reforma') return '#f39c12';
+        if (status === 'Fechada')    return '#e11d48';
+        return '#0038A8';
+    }
+
+    function adicionarMarcador(ag) {
+        if (!ag.lat || !ag.lng) return;
+
+        const marker = new google.maps.Marker({
+            position: { lat: ag.lat, lng: ag.lng },
+            map: gMap,
+            title: ag.nome,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 9,
+                fillColor: corPorStatus(ag.status),
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+            }
+        });
+
+        marker.addListener('click', () => {
+            infoWindow.setContent(`
+                <div style="font-family:'Montserrat',sans-serif;min-width:200px;padding:4px 0;">
+                    <p style="font-weight:700;font-size:.95rem;margin:0 0 4px;color:#0038A8;">${ag.nome}</p>
+                    <p style="margin:0 0 2px;font-size:.82rem;color:#555;">
+                        <strong>Prefixo:</strong> ${ag.prefixo}
+                    </p>
+                    <p style="margin:0 0 2px;font-size:.82rem;color:#555;">
+                        <strong>Endereço:</strong> ${ag.endereco || ag.municipio + ' - ' + ag.uf}
+                    </p>
+                    <p style="margin:0 0 8px;font-size:.82rem;color:#555;">
+                        <strong>Status:</strong> ${ag.status}
+                    </p>
+                    <a href="/detalhes/${ag.prefixo}"
+                       style="display:inline-block;background:#0038A8;color:#fff;padding:5px 12px;
+                              border-radius:6px;font-size:.8rem;font-weight:600;text-decoration:none;">
+                        Ver Detalhes →
+                    </a>
+                </div>
+            `);
+            infoWindow.open(gMap, marker);
+        });
+
+        gMarkers.push(marker);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Busca e renderização                                                 */
+    /* ------------------------------------------------------------------ */
+    async function buscarAgencias() {
+        const q  = document.getElementById('search-input').value.trim();
+        const uf = document.getElementById('filter-estado').value;
+
+        const params = new URLSearchParams();
+        if (q)  params.append('q', q);
+        if (uf) params.append('uf', uf);
+
+        try {
+            const res    = await fetch('/api/agencias?' + params.toString());
+            let agencias = await res.json();
+
+            // Filtro segmento
+            const segsSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+                .filter(cb => cb.checked && ['Varejo','Empresa','Agronegócio','Estilo','Governo'].includes(cb.value))
+                .map(cb => cb.value);
+            if (segsSel.length < 5)
+                agencias = agencias.filter(ag => !ag.segmento || segsSel.includes(ag.segmento));
+
+            // Filtro status
+            const statusSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+                .filter(cb => cb.checked && ['Operação Normal','Em Reforma','Fechada'].includes(cb.value))
+                .map(cb => cb.value);
+            if (statusSel.length < 3)
+                agencias = agencias.filter(ag => !ag.status || statusSel.includes(ag.status));
+
+            renderTabela(agencias);
+            renderMapa(agencias);
+
+            document.getElementById('resultado-count').textContent =
+                `${agencias.length} agência(s) encontrada(s)`;
+        } catch(err) {
+            console.error('Erro na busca:', err);
+        }
+    }
+
+    function renderTabela(agencias) {
+        const tbody = document.getElementById('table-body');
+        if (!agencias.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma agência encontrada.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = agencias.map(ag => `
+            <tr>
+                <td class="fw-bold">${ag.prefixo}</td>
+                <td>${ag.nome}</td>
+                <td class="text-muted">${ag.municipio} / ${ag.uf}</td>
+                <td>${ag.segmento || '-'}</td>
+                <td><span class="badge ${badgeStatus(ag.status)}">${ag.status || '-'}</span></td>
+                <td>
+                    <a href="/detalhes/${ag.prefixo}" class="btn btn-primary"
+                       style="padding:6px 14px;font-size:.8rem;">
+                        <i class="fas fa-eye"></i> Detalhes
+                    </a>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderMapa(agencias) {
+        if (!gMap) return;
+        limparMarcadores();
+        agencias.forEach(ag => adicionarMarcador(ag));
+
+        // Ajusta bounds para mostrar todos os marcadores
+        if (gMarkers.length > 0) {
+            const bounds = new google.maps.LatLngBounds();
+            gMarkers.forEach(m => bounds.extend(m.getPosition()));
+            gMap.fitBounds(bounds, { padding: 60 });
+            // Não deixa zoom muito alto para 1 marcador
+            const listener = google.maps.event.addListener(gMap, 'idle', () => {
+                if (gMap.getZoom() > 14) gMap.setZoom(14);
+                google.maps.event.removeListener(listener);
+            });
+        }
+    }
+
+    function badgeStatus(status) {
+        if (status === 'Operação Normal') return 'badge-ok';
+        if (status === 'Em Reforma')      return 'badge-reforma';
+        if (status === 'Fechada')         return 'badge-inativo';
+        return 'badge-consulta';
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Filtros de região / estado                                           */
+    /* ------------------------------------------------------------------ */
     function updateStates() {
         const regiao = document.getElementById('filter-regiao').value;
         const sel    = document.getElementById('filter-estado');
@@ -162,21 +338,44 @@
         }
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Toggle painel de filtros                                             */
+    /* ------------------------------------------------------------------ */
+    const filtersPanel = document.getElementById('filters-panel');
+    const toggleBtn    = document.getElementById('toggle-filters');
+    const toggleIcon   = toggleBtn.querySelector('i');
+
     toggleBtn.addEventListener('click', () => {
         filtersPanel.classList.toggle('collapsed');
         toggleBtn.classList.toggle('collapsed');
         toggleIcon.classList.toggle('fa-chevron-left');
         toggleIcon.classList.toggle('fa-chevron-right');
-        setTimeout(() => { if (map) google.maps.event.trigger(map, "resize"); }, 320);
+        // Força o Google Maps a recalcular o tamanho
+        setTimeout(() => {
+            if (gMap) google.maps.event.trigger(gMap, 'resize');
+        }, 320);
     });
 
+    /* ------------------------------------------------------------------ */
+    /* Alternar mapa / lista                                                */
+    /* ------------------------------------------------------------------ */
     function switchView(view) {
-        const mapView  = document.getElementById('map-view');
-        const listView = document.getElementById('list-view');
-        document.getElementById('btn-map').classList.toggle('active', view === 'map');
+        document.getElementById('map-view').style.display  = view === 'map'  ? 'block' : 'none';
+        document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
+        document.getElementById('btn-map').classList.toggle('active',  view === 'map');
         document.getElementById('btn-list').classList.toggle('active', view === 'list');
-        mapView.style.display  = view === 'map'  ? 'block' : 'none';
-        listView.style.display = view === 'list' ? 'block' : 'none';
+        if (view === 'map' && gMap)
+            setTimeout(() => google.maps.event.trigger(gMap, 'resize'), 50);
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Enter na busca                                                       */
+    /* ------------------------------------------------------------------ */
+    document.getElementById('search-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') buscarAgencias();
+    });
 </script>
+
+<!-- Google Maps carregado por último; callback=initMap dispara a inicialização -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&loading=async" async defer></script>
 {% endblock %}

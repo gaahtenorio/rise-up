@@ -8,39 +8,61 @@
     <header class="agency-header">
         <div>
             <div class="badge-row">
-                <span class="badge badge-blue">VAREJO</span>
+                <span class="badge badge-blue">{{ agencia.segmento or 'VAREJO' }}</span>
+                {% if agencia.carbono %}
                 <span class="badge badge-esg"><i class="fas fa-leaf"></i> Selo ESG A+</span>
+                {% endif %}
             </div>
-            <h1>Agência {{ agencia.nome }}</h1>
+            <h1>{{ agencia.nome }}</h1>
             <p class="sub-info">
                 <i class="fas fa-fingerprint"></i> Prefixo: <strong>{{ agencia.prefixo }}</strong>
                 <span class="sep">|</span>
-                <i class="fas fa-city"></i> {{ agencia.cidade }} — {{ agencia.estado }}
+                <i class="fas fa-city"></i> {{ agencia.municipio }} — {{ agencia.uf }}
             </p>
         </div>
         <div class="header-actions">
-            <button class="btn btn-ghost"><i class="fas fa-edit"></i> Editar Dados</button>
-            <button class="btn btn-primary"><i class="fas fa-tools"></i> Abrir Chamado</button>
+            {% if user_level == 'Gestão' %}
+            <button class="btn btn-ghost" onclick="abrirEdicao()">
+                <i class="fas fa-edit"></i> Editar Dados
+            </button>
+            {% endif %}
+            <a href="{{ url_for('agencias') }}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
         </div>
     </header>
 
     <!-- Cards de status -->
     <div class="status-grid">
-        <div class="status-card ok">
+        <div class="status-card {% if agencia.status == 'Operação Normal' %}ok{% elif agencia.status == 'Em Reforma' %}warning{% else %}info{% endif %}">
             <p>Status de Operação</p>
-            <h4><i class="fas fa-check-circle"></i> Operação Normal</h4>
+            <h4>
+                {% if agencia.status == 'Operação Normal' %}<i class="fas fa-check-circle"></i>
+                {% elif agencia.status == 'Em Reforma' %}<i class="fas fa-tools"></i>
+                {% else %}<i class="fas fa-info-circle"></i>{% endif %}
+                {{ agencia.status or 'Operação Normal' }}
+            </h4>
         </div>
         <div class="status-card info">
-            <p>Horário de Atendimento</p>
-            <h4>10:00 às 16:00</h4>
+            <p>Segmento</p>
+            <h4>{{ agencia.segmento or 'Varejo' }}</h4>
         </div>
-        <div class="status-card warning">
-            <p>Próxima Manutenção</p>
-            <h4>15/05/2026 (Preventiva)</h4>
+        <div class="status-card {% if agencia.acessibilidade %}ok{% else %}warning{% endif %}">
+            <p>Acessibilidade</p>
+            <h4>
+                {% if agencia.acessibilidade %}
+                <i class="fas fa-wheelchair"></i> Totalmente Adaptada
+                {% else %}
+                <i class="fas fa-exclamation-triangle"></i> Parcial / Não Adaptada
+                {% endif %}
+            </h4>
         </div>
         <div class="status-card esg">
             <p>Créditos de Carbono</p>
-            <h4>+12.5 ton/ano</h4>
+            <h4>
+                {% if agencia.carbono %}+{{ agencia.carbono }} ton/ano
+                {% else %}Não informado{% endif %}
+            </h4>
         </div>
     </div>
 
@@ -56,43 +78,66 @@
                         <td>Endereço Completo:</td>
                         <td>{{ agencia.endereco }}</td>
                     </tr>
+                    {% if agencia.cep %}
                     <tr>
-                        <td>Gerente Geral:</td>
-                        <td>Nome do Gestor Registrado</td>
+                        <td>CEP:</td>
+                        <td>{{ agencia.cep }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Gerente Responsável:</td>
+                        <td>{{ agencia.gerente or 'Não informado' }}</td>
                     </tr>
                     <tr>
                         <td>Telefone de Contato:</td>
-                        <td>(81) 3456-7890</td>
+                        <td>{{ agencia.telefone or 'Não informado' }}</td>
                     </tr>
                     <tr>
                         <td>Acessibilidade:</td>
-                        <td class="text-success">Totalmente Adaptada (NBR 9050)</td>
+                        <td class="{% if agencia.acessibilidade %}text-success{% else %}text-warning{% endif %}">
+                            {% if agencia.acessibilidade %}Totalmente Adaptada (NBR 9050)
+                            {% else %}Parcial / Não Adaptada{% endif %}
+                        </td>
                     </tr>
                 </table>
             </div>
 
             <div class="card">
                 <h3 class="card-title"><i class="fas fa-seedling"></i> Monitoramento de Recursos (ESG)</h3>
+
+                {% if agencia.consumo_energia %}
                 <div class="resource-item">
                     <div class="resource-header">
                         <span><i class="fas fa-bolt"></i> Consumo de Energia</span>
-                        <span class="fw-bold">1.240 kWh <small>/mês</small></span>
+                        <span class="fw-bold">{{ agencia.consumo_energia }} kWh <small>/mês</small></span>
                     </div>
                     <div class="resource-track">
-                        <div class="resource-fill warning" style="width:85%"></div>
+                        <div class="resource-fill warning"
+                             style="width:{{ [agencia.consumo_energia / 15, 100] | min }}%"></div>
                     </div>
                     <small class="meta-label">Meta: Manter abaixo de 1.100 kWh</small>
                 </div>
+                {% else %}
+                <p class="text-muted" style="margin-bottom:12px;">
+                    <i class="fas fa-bolt"></i> Consumo de energia não informado.
+                </p>
+                {% endif %}
+
+                {% if agencia.consumo_agua %}
                 <div class="resource-item">
                     <div class="resource-header">
                         <span><i class="fas fa-tint"></i> Consumo de Água</span>
-                        <span class="fw-bold">42 m³ <small>/mês</small></span>
+                        <span class="fw-bold">{{ agencia.consumo_agua }} m³ <small>/mês</small></span>
                     </div>
                     <div class="resource-track">
-                        <div class="resource-fill success" style="width:45%"></div>
+                        <div class="resource-fill success"
+                             style="width:{{ [agencia.consumo_agua / 1, 100] | min }}%"></div>
                     </div>
-                    <small class="meta-label">Excelente: 15% abaixo da meta</small>
+                    <small class="meta-label">Meta: Manter abaixo de 50 m³</small>
                 </div>
+                {% else %}
+                <p class="text-muted"><i class="fas fa-tint"></i> Consumo de água não informado.</p>
+                {% endif %}
             </div>
         </div>
 
@@ -100,14 +145,23 @@
         <div>
             <div class="card">
                 <h3 class="card-title"><i class="fas fa-map-marked-alt"></i> Localização Exata</h3>
+
+                {% if agencia.lat and agencia.lng %}
+                <div id="mini-map" class="mini-map-box"
+                     style="height:220px;border-radius:8px;overflow:hidden;"></div>
+                {% else %}
                 <div class="mini-map-box">
                     <div class="map-placeholder">
                         <i class="fas fa-map-pin"></i>
-                        <p>Carregando Georreferenciamento...</p>
+                        <p>Coordenadas não cadastradas</p>
                     </div>
                 </div>
+                {% endif %}
+
                 <div class="location-footer">
-                    <p class="address-text"><i class="fas fa-location-dot"></i> {{ agencia.endereco }}</p>
+                    <p class="address-text">
+                        <i class="fas fa-location-dot"></i> {{ agencia.endereco }}
+                    </p>
                     <a class="btn btn-outline"
                        href="https://www.google.com/maps/search/{{ agencia.endereco | urlencode }}"
                        target="_blank" rel="noopener">
@@ -128,4 +182,245 @@
 
     </div>
 </div>
+
+<!-- ===================== MODAL EDIÇÃO (apenas Gestão) ===================== -->
+{% if user_level == 'Gestão' %}
+<div id="modal-edicao" class="modal-overlay" style="display:none;"
+     role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+            <h3>Editar Agência {{ agencia.prefixo }}</h3>
+            <button class="modal-close" onclick="fecharEdicao()" aria-label="Fechar">&times;</button>
+        </div>
+        <form id="form-edicao" onsubmit="salvarEdicao(event)">
+            <div class="form-grid cols-4-8" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Prefixo</label>
+                    <input type="text" class="form-input" value="{{ agencia.prefixo }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" class="form-input" id="edit-nome"
+                           value="{{ agencia.nome }}" required>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Município *</label>
+                    <input type="text" class="form-input" id="edit-municipio"
+                           value="{{ agencia.municipio }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UF *</label>
+                    <select class="form-input" id="edit-uf" required>
+                        {% for uf in ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] %}
+                        <option value="{{ uf }}" {% if agencia.uf == uf %}selected{% endif %}>{{ uf }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Logradouro</label>
+                <input type="text" class="form-input" id="edit-logradouro"
+                       value="{{ agencia.logradouro or '' }}">
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Número</label>
+                    <input type="text" class="form-input" id="edit-numero"
+                           value="{{ agencia.numero or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bairro</label>
+                    <input type="text" class="form-input" id="edit-bairro"
+                           value="{{ agencia.bairro or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">CEP</label>
+                    <input type="text" class="form-input" id="edit-cep"
+                           value="{{ agencia.cep or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" class="form-input" id="edit-telefone"
+                           value="{{ agencia.telefone or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Gerente</label>
+                    <input type="text" class="form-input" id="edit-gerente"
+                           value="{{ agencia.gerente or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Segmento</label>
+                    <select class="form-input" id="edit-segmento">
+                        {% for seg in ['Varejo','Empresa','Agronegócio','Estilo','Governo'] %}
+                        <option value="{{ seg }}"
+                            {% if agencia.segmento == seg %}selected{% endif %}>{{ seg }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" id="edit-status">
+                        {% for st in ['Operação Normal','Em Reforma','Fechada','Em Implantação'] %}
+                        <option value="{{ st }}"
+                            {% if agencia.status == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Acessibilidade</label>
+                    <select class="form-input" id="edit-acessibilidade">
+                        <option value="true"  {% if agencia.acessibilidade %}selected{% endif %}>Totalmente Adaptada</option>
+                        <option value="false" {% if not agencia.acessibilidade %}selected{% endif %}>Parcial / Não Adaptada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-input" id="edit-lat"
+                           value="{{ agencia.lat or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-input" id="edit-lng"
+                           value="{{ agencia.lng or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-3" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Energia (kWh/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-energia"
+                           value="{{ agencia.consumo_energia or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Água (m³/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-agua"
+                           value="{{ agencia.consumo_agua or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Carbono (ton/ano)</label>
+                    <input type="number" step="any" class="form-input" id="edit-carbono"
+                           value="{{ agencia.carbono or '' }}">
+                </div>
+            </div>
+            <div id="form-edicao-msg" class="form-msg" style="display:none;"></div>
+            <div class="form-actions" style="margin-top:20px;">
+                <button type="button" class="btn btn-ghost" onclick="fecharEdicao()"
+                        style="margin-right:12px;">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirEdicao()  { document.getElementById('modal-edicao').style.display = 'flex'; }
+function fecharEdicao() { document.getElementById('modal-edicao').style.display = 'none'; }
+
+document.getElementById('modal-edicao').addEventListener('click', function(e) {
+    if (e.target === this) fecharEdicao();
+});
+
+async function salvarEdicao(e) {
+    e.preventDefault();
+    const body = {
+        nome:            document.getElementById('edit-nome').value.trim(),
+        municipio:       document.getElementById('edit-municipio').value.trim(),
+        uf:              document.getElementById('edit-uf').value,
+        logradouro:      document.getElementById('edit-logradouro').value.trim(),
+        numero:          document.getElementById('edit-numero').value.trim(),
+        bairro:          document.getElementById('edit-bairro').value.trim(),
+        cep:             document.getElementById('edit-cep').value.trim(),
+        telefone:        document.getElementById('edit-telefone').value.trim(),
+        gerente:         document.getElementById('edit-gerente').value.trim(),
+        segmento:        document.getElementById('edit-segmento').value,
+        status:          document.getElementById('edit-status').value,
+        acessibilidade:  document.getElementById('edit-acessibilidade').value === 'true',
+        lat:             document.getElementById('edit-lat').value   || null,
+        lng:             document.getElementById('edit-lng').value   || null,
+        consumo_energia: document.getElementById('edit-energia').value || null,
+        consumo_agua:    document.getElementById('edit-agua').value    || null,
+        carbono:         document.getElementById('edit-carbono').value || null,
+    };
+    try {
+        const res  = await fetch('/api/agencias/{{ agencia.id }}', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = document.getElementById('form-edicao-msg');
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+            return;
+        }
+        fecharEdicao();
+        location.reload();
+    } catch(err) {
+        const msg = document.getElementById('form-edicao-msg');
+        msg.textContent   = 'Erro de conexão.';
+        msg.className     = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+</script>
+{% endif %}
+
+{% if agencia.lat and agencia.lng %}
+<script>
+    /* Mini-mapa Google Maps na página de detalhes */
+    function initMiniMap() {
+        const pos = { lat: {{ agencia.lat }}, lng: {{ agencia.lng }} };
+
+        const miniMap = new google.maps.Map(document.getElementById('mini-map'), {
+            center: pos,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: true,
+            styles: [
+                { elementType: 'geometry',    stylers: [{ color: '#f5f5f5' }] },
+                { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+                { featureType: 'water',       elementType: 'geometry',
+                  stylers: [{ color: '#e0e6ed' }] }
+            ]
+        });
+
+        const marker = new google.maps.Marker({
+            position: pos,
+            map: miniMap,
+            title: '{{ agencia.nome }}',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: '#0038A8',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2.5
+            }
+        });
+
+        const iw = new google.maps.InfoWindow({
+            content: '<strong style="font-family:Montserrat,sans-serif;color:#0038A8;">{{ agencia.nome }}</strong>'
+        });
+        marker.addListener('click', () => iw.open(miniMap, marker));
+        iw.open(miniMap, marker);
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+        async defer></script>
+{% endif %}
 {% endblock %}

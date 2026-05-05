@@ -11,15 +11,15 @@
     <div class="stat-card">
         <div class="stat-icon yellow"><i class="fas fa-tools"></i></div>
         <div class="stat-data">
-            <span class="stat-value">{{ stats.em_reforma if stats else '124' }}</span>
+            <span class="stat-value">{{ stats.em_reforma if stats else '0' }}</span>
             <span class="stat-label">Agências em Reforma</span>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon blue"><i class="fas fa-bolt"></i></div>
+        <div class="stat-icon blue"><i class="fas fa-building"></i></div>
         <div class="stat-data">
-            <span class="stat-value">1.240 <small style="font-size:.6em">kWh</small></span>
-            <span class="stat-label">Consumo Energia (Mês)</span>
+            <span class="stat-value">{{ stats.total if stats else '0' }}</span>
+            <span class="stat-label">Total de Agências</span>
         </div>
     </div>
     <div class="stat-card">
@@ -42,8 +42,10 @@
     <!-- Mapa principal -->
     <div class="chart-box">
         <div class="chart-box-header">
-            <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica de Reformas</h3>
-            <p>Visualização de obras prioritárias por região</p>
+            <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica das Agências</h3>
+            <p>Todas as unidades cadastradas — <span style="color:#0038A8;">●</span> Normal &nbsp;
+               <span style="color:#f39c12;">●</span> Em Reforma &nbsp;
+               <span style="color:#e11d48;">●</span> Fechada</p>
         </div>
         <div id="map-container" class="map-render"></div>
     </div>
@@ -92,58 +94,117 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&libraries=places,marker" async defer></script>
+
 <script>
-async function initMap() {
-    const { Map } = await google.maps.importLibrary("maps");
-    const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-
-    const map = new Map(document.getElementById("map-container"), {
-        zoom: 4,
-        center: { lat: -14.235, lng: -51.925 },
-        styles: [
-            { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
-            { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-            { featureType: "administrative.country", elementType: "geometry.stroke",
-              stylers: [{ color: "#0038A8" }, { weight: 1 }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#e0e6ed" }] }
-        ],
-        disableDefaultUI: true,
-        mapId: "DISEC_DASHBOARD_MAP"
-    });
-
-    [
-        { pos: { lat: -8.0578,  lng: -34.8829 }, label: "15", nome: "Recife — Superintendência" },
-        { pos: { lat: -23.5505, lng: -46.6333 }, label: "22", nome: "São Paulo — Polo Operacional" },
-        { pos: { lat: -15.7942, lng: -47.8822 }, label: "08", nome: "Brasília — Sede" }
-    ].forEach(local => {
-        const pin = new PinElement({
-            background: "#0038A8", glyph: local.label,
-            glyphColor: "white", borderColor: "white"
+    /* ------------------------------------------------------------------ */
+    /* Inicialização do Google Maps — carrega agências reais da API        */
+    /* ------------------------------------------------------------------ */
+    async function initMap() {
+        const map = new google.maps.Map(document.getElementById('map-container'), {
+            zoom: 4,
+            center: { lat: -14.235, lng: -51.925 },
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            styles: [
+                { elementType: 'geometry',      stylers: [{ color: '#f5f5f5' }] },
+                { elementType: 'labels.icon',   stylers: [{ visibility: 'off' }] },
+                { featureType: 'water',         elementType: 'geometry',
+                  stylers: [{ color: '#e0e6ed' }] },
+                { featureType: 'administrative.country', elementType: 'geometry.stroke',
+                  stylers: [{ color: '#0038A8' }, { weight: 1.5 }] },
+                { featureType: 'administrative.province', elementType: 'geometry.stroke',
+                  stylers: [{ color: '#c8d0e0' }, { weight: 0.8 }] }
+            ]
         });
-        new AdvancedMarkerElement({ position: local.pos, map, content: pin.element, title: local.nome });
-    });
-}
 
-const ctx = document.getElementById('trendChart').getContext('2d');
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: ['Jan', 'Fev', 'Mar', 'Abr'],
-        datasets: [{
-            label: 'Consumo Global',
-            data: [1300, 1250, 1280, 1240],
-            borderColor: '#0038A8',
-            backgroundColor: 'rgba(0,56,168,0.08)',
-            fill: true, tension: 0.4, pointRadius: 4, borderWidth: 3
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { display: false }, x: { grid: { display: false } } }
+        const infoWindow = new google.maps.InfoWindow();
+
+        function corPorStatus(status) {
+            if (status === 'Em Reforma') return '#f39c12';
+            if (status === 'Fechada')    return '#e11d48';
+            return '#0038A8';
+        }
+
+        try {
+            const res      = await fetch('/api/agencias');
+            const agencias = await res.json();
+
+            agencias.forEach(ag => {
+                if (!ag.lat || !ag.lng) return;
+
+                const marker = new google.maps.Marker({
+                    position: { lat: ag.lat, lng: ag.lng },
+                    map,
+                    title: ag.nome,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: corPorStatus(ag.status),
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    }
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.setContent(`
+                        <div style="font-family:'Montserrat',sans-serif;min-width:190px;padding:4px 0;">
+                            <p style="font-weight:700;font-size:.9rem;margin:0 0 4px;color:#0038A8;">${ag.nome}</p>
+                            <p style="margin:0 0 2px;font-size:.8rem;color:#555;">
+                                <strong>Prefixo:</strong> ${ag.prefixo}
+                            </p>
+                            <p style="margin:0 0 2px;font-size:.8rem;color:#555;">
+                                <strong>Local:</strong> ${ag.municipio} / ${ag.uf}
+                            </p>
+                            <p style="margin:0 0 8px;font-size:.8rem;color:#555;">
+                                <strong>Status:</strong> ${ag.status}
+                            </p>
+                            <a href="/detalhes/${ag.prefixo}"
+                               style="display:inline-block;background:#0038A8;color:#fff;
+                                      padding:4px 10px;border-radius:5px;font-size:.78rem;
+                                      font-weight:600;text-decoration:none;">
+                                Ver Detalhes →
+                            </a>
+                        </div>
+                    `);
+                    infoWindow.open(map, marker);
+                });
+            });
+        } catch(err) {
+            console.error('Erro ao carregar agências no mapa:', err);
+        }
     }
-});
+
+    /* ------------------------------------------------------------------ */
+    /* Gráfico de tendência (Chart.js)                                     */
+    /* ------------------------------------------------------------------ */
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr'],
+            datasets: [{
+                label: 'Consumo Global',
+                data: [1300, 1250, 1280, 1240],
+                borderColor: '#0038A8',
+                backgroundColor: 'rgba(0,56,168,0.08)',
+                fill: true, tension: 0.4, pointRadius: 4, borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { display: false },
+                x: { grid: { display: false } }
+            }
+        }
+    });
 </script>
+
+<!-- Google Maps — callback=initMap -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&loading=async"
+        async defer></script>
 {% endblock %}
