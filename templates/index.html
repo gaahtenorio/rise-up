@@ -40,7 +40,6 @@
 
 <div class="index-cards-grid">
 
-    <!-- 1. Dashboard -->
     <div class="index-card">
         <div>
             <div class="card-icon"><i class="fas fa-chart-line"></i></div>
@@ -50,7 +49,6 @@
         <a href="{{ url_for('dashboard') }}" class="btn-card">Ver Indicadores</a>
     </div>
 
-    <!-- 2. Localizador -->
     <div class="index-card">
         <div>
             <div class="card-icon"><i class="fas fa-map-marked-alt"></i></div>
@@ -60,7 +58,6 @@
         <a href="{{ url_for('agencias') }}" class="btn-card">Acessar Mapa</a>
     </div>
 
-    <!-- 3. Informações Técnicas (penúltimo) -->
     <div class="index-card">
         <div>
             <div class="card-icon"><i class="fas fa-info-circle"></i></div>
@@ -70,7 +67,6 @@
         <a href="{{ url_for('detalhes_index') }}" class="btn-card">Ver Detalhes</a>
     </div>
 
-    <!-- 4. Gestão de Dados (último — só para Gestão) -->
     {% if user_level == 'Gestão' %}
     <div class="index-card card-admin">
         <div>
