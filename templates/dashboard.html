@@ -39,7 +39,6 @@
 </div>
 
 <div class="dashboard-grid">
-    <!-- Mapa principal -->
     <div class="chart-box">
         <div class="chart-box-header">
             <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica das Agências</h3>
@@ -50,7 +49,6 @@
         <div id="map-container" class="map-render"></div>
     </div>
 
-    <!-- Gráficos laterais -->
     <div class="side-charts">
         <div class="chart-box">
             <div class="chart-box-header">
@@ -96,9 +94,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    /* ------------------------------------------------------------------ */
-    /* Inicialização do Google Maps — carrega agências reais da API        */
-    /* ------------------------------------------------------------------ */
     async function initMap() {
         const map = new google.maps.Map(document.getElementById('map-container'), {
             zoom: 4,
@@ -166,9 +161,6 @@
         }
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Gráfico de tendência (Chart.js)                                     */
-    /* ------------------------------------------------------------------ */
     const ctx = document.getElementById('trendChart').getContext('2d');
     new Chart(ctx, {
         type: 'line',
