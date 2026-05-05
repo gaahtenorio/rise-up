@@ -5,14 +5,9 @@ from flask import (Flask, render_template, redirect, url_for,
                    session, request, abort, jsonify, flash)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv
 from datetime import datetime
 
-load_dotenv()
 
-# ---------------------------------------------------------------------------
-# App & DB
-# ---------------------------------------------------------------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback_inseguro_troque_em_producao')
 
@@ -26,9 +21,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# ---------------------------------------------------------------------------
-# Modelos
-# ---------------------------------------------------------------------------
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
 
@@ -120,9 +112,6 @@ class Agencia(db.Model):
         }
 
 
-# ---------------------------------------------------------------------------
-# Seed inicial
-# ---------------------------------------------------------------------------
 def seed_db():
     """Popula o banco com dados iniciais se estiver vazio."""
     if Usuario.query.count() == 0:
@@ -179,9 +168,6 @@ def seed_db():
             pass
 
 
-# ---------------------------------------------------------------------------
-# Decorators
-# ---------------------------------------------------------------------------
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -202,9 +188,6 @@ def gestao_required(f):
     return decorated
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def get_template_context():
     return {
         'user_level': session.get('user_level'),
@@ -225,9 +208,6 @@ def get_stats():
     }
 
 
-# ---------------------------------------------------------------------------
-# Autenticação
-# ---------------------------------------------------------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user_id' in session:
@@ -257,9 +237,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ---------------------------------------------------------------------------
-# Páginas principais
-# ---------------------------------------------------------------------------
 @app.route('/')
 @login_required
 def index():
@@ -323,9 +300,6 @@ def admin():
     return render_template('admin.html', **ctx)
 
 
-# ---------------------------------------------------------------------------
-# API — Agências
-# ---------------------------------------------------------------------------
 @app.route('/api/agencias')
 @login_required
 def api_agencias():
@@ -436,9 +410,6 @@ def api_agencias_deletar(agencia_id):
     return jsonify({'ok': True})
 
 
-# ---------------------------------------------------------------------------
-# API — Usuários
-# ---------------------------------------------------------------------------
 @app.route('/api/usuarios')
 @gestao_required
 def api_usuarios():
@@ -512,9 +483,6 @@ def api_usuarios_deletar(usuario_id):
     return jsonify({'ok': True})
 
 
-# ---------------------------------------------------------------------------
-# Tratamento de erros
-# ---------------------------------------------------------------------------
 @app.errorhandler(403)
 def forbidden(e):
     ctx = get_template_context()
@@ -533,9 +501,6 @@ def server_error(e):
     return render_template('errors/500.html', **ctx), 500
 
 
-# ---------------------------------------------------------------------------
-# Inicialização
-# ---------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
     seed_db()
