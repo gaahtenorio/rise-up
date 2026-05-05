@@ -1,8 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
 
-    // ------------------------------------------------------------------
-    // Sidebar toggle
-    // ------------------------------------------------------------------
     const menuToggle = document.getElementById('sidebarCollapse');
     const sidebar = document.querySelector('#sidebar');
     const content = document.querySelector('#content');
@@ -12,16 +9,12 @@ document.addEventListener("DOMContentLoaded", function () {
             sidebar.classList.toggle('active');
             content.classList.toggle('active');
 
-            // Atualiza o mapa Leaflet se estiver presente
             if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
                 setTimeout(() => map.invalidateSize(), 300);
             }
         });
     }
 
-    // ------------------------------------------------------------------
-    // Busca de agências (página /agencias)
-    // ------------------------------------------------------------------
     const searchInput = document.getElementById('searchInput');
     const searchBtn   = document.getElementById('searchBtn');
     const agenciasGrid = document.getElementById('agencias-grid');
@@ -85,9 +78,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
-// ------------------------------------------------------------------
-// Foca o mapa Leaflet em uma coordenada
-// ------------------------------------------------------------------
 function focarNoMapa(lat, lng) {
     if (typeof map !== 'undefined' && map && typeof map.setView === 'function') {
         map.setView([lat, lng], 15);
