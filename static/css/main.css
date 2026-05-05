@@ -1467,3 +1467,14 @@ input, select, textarea { font-family: inherit; }
     .form-grid.cols-3 { grid-template-columns: 1fr; }
     .modal-box { max-width: 100%; }
 }
+
+/* ============================================================
+   20. STAT CARD — alerta (sem geolocalização)
+   ============================================================ */
+.stat-card-alert .stat-icon {
+    background: rgba(225, 29, 72, 0.1);
+    color: var(--color-red);
+}
+.stat-card-alert .stat-value {
+    color: var(--color-red);
+}

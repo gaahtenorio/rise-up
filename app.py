@@ -213,11 +213,15 @@ def get_template_context():
 
 
 def get_stats():
-    total      = Agencia.query.count()
-    em_reforma = Agencia.query.filter_by(status='Em Reforma').count()
+    total           = Agencia.query.count()
+    em_reforma      = Agencia.query.filter_by(status='Em Reforma').count()
+    sem_coords      = Agencia.query.filter(
+                          db.or_(Agencia.lat == None, Agencia.lng == None)
+                      ).count()
     return {
         'total':      total,
         'em_reforma': em_reforma,
+        'sem_coords': sem_coords,
     }
 
 
@@ -264,6 +268,7 @@ def index():
     stats = get_stats()
     ctx['total_agencias'] = stats['total']
     ctx['em_reforma']     = stats['em_reforma']
+    ctx['sem_coords']     = stats['sem_coords']
     return render_template('index.html', **ctx)
 
 

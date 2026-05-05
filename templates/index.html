@@ -29,16 +29,18 @@
             <span class="stat-label">Meta ESG Alcançada</span>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-icon purple"><i class="fas fa-headset"></i></div>
+    <div class="stat-card {% if sem_coords > 0 %}stat-card-alert{% endif %}">
+        <div class="stat-icon purple"><i class="fas fa-map-pin"></i></div>
         <div class="stat-data">
-            <span class="stat-value">08</span>
-            <span class="stat-label">Chamados Pendentes</span>
+            <span class="stat-value">{{ sem_coords }}</span>
+            <span class="stat-label">Sem Geolocalização</span>
         </div>
     </div>
 </div>
 
 <div class="index-cards-grid">
+
+    <!-- 1. Dashboard -->
     <div class="index-card">
         <div>
             <div class="card-icon"><i class="fas fa-chart-line"></i></div>
@@ -48,33 +50,37 @@
         <a href="{{ url_for('dashboard') }}" class="btn-card">Ver Indicadores</a>
     </div>
 
+    <!-- 2. Localizador -->
     <div class="index-card">
         <div>
             <div class="card-icon"><i class="fas fa-map-marked-alt"></i></div>
             <h3>Localizador de Agências</h3>
-            <p>Consulte a base de dados nacional, visualize unidades no mapa e verifique detalhes técnicos das agências do Banco do Brasil.</p>
+            <p>Consulte a base de dados nacional, visualize unidades no mapa e filtre por região, segmento ou status de infraestrutura.</p>
         </div>
         <a href="{{ url_for('agencias') }}" class="btn-card">Acessar Mapa</a>
     </div>
 
+    <!-- 3. Informações Técnicas (penúltimo) -->
+    <div class="index-card">
+        <div>
+            <div class="card-icon"><i class="fas fa-info-circle"></i></div>
+            <h3>Informações Técnicas</h3>
+            <p>Acesse a ficha completa de qualquer agência: endereço, gerente, telefone, dados ESG, localização no mapa e muito mais.</p>
+        </div>
+        <a href="{{ url_for('detalhes_index') }}" class="btn-card">Ver Detalhes</a>
+    </div>
+
+    <!-- 4. Gestão de Dados (último — só para Gestão) -->
     {% if user_level == 'Gestão' %}
     <div class="index-card card-admin">
         <div>
             <div class="card-icon"><i class="fas fa-user-shield"></i></div>
             <h3>Gestão de Dados</h3>
-            <p>Acesso de <strong>Gestor</strong> liberado. Você pode incluir, editar ou remover registros de agências e usuários da base central DISEC.</p>
+            <p>Acesso de <strong>Gestor</strong> liberado. Inclua, edite ou remova registros de agências e usuários da base central DISEC.</p>
         </div>
         <a href="{{ url_for('admin') }}" class="btn-card">Gerenciar Base</a>
     </div>
     {% endif %}
 
-    <div class="index-card">
-        <div>
-            <div class="card-icon"><i class="fas fa-headset"></i></div>
-            <h3>Suporte Técnico</h3>
-            <p>Precisa de ajuda com o sistema ou quer solicitar novas permissões? Abra um chamado diretamente com a equipe técnica da DISEC.</p>
-        </div>
-        <a href="#" class="btn-card" style="background:#555;">Abrir Chamado</a>
-    </div>
 </div>
 {% endblock %}
