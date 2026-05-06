@@ -5,7 +5,6 @@
 {% block content %}
 <div class="agencias-wrapper">
 
-    <!-- Painel de filtros -->
     <aside class="filters-panel" id="filters-panel">
         <h3 class="filter-panel-title">Filtros Avançados</h3>
 
@@ -77,12 +76,10 @@
         </button>
     </aside>
 
-    <!-- Botão toggle -->
     <button class="panel-toggle-btn" id="toggle-filters" title="Recolher filtros" aria-label="Recolher filtros">
         <i class="fas fa-chevron-left"></i>
     </button>
 
-    <!-- Área de resultados -->
     <section class="results-area">
         <div class="floating-search">
             <div class="search-bar">
@@ -132,9 +129,6 @@
 
 {% block extra_js %}
 <script>
-    /* ------------------------------------------------------------------ */
-    /* Estado global                                                        */
-    /* ------------------------------------------------------------------ */
     let gMap;
     let gMarkers = [];
 
@@ -148,9 +142,6 @@
         'Sul':          ['PR','RS','SC']
     };
 
-    /* ------------------------------------------------------------------ */
-    /* Inicialização do Google Maps                                         */
-    /* ------------------------------------------------------------------ */
     function initMap() {
         gMap = new google.maps.Map(document.getElementById('google-map-agencias'), {
             center: { lat: -14.235, lng: -51.925 },
@@ -160,13 +151,9 @@
             fullscreenControl: true
         });
 
-        // Busca inicial após mapa pronto
         buscarAgencias();
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Marcadores                                                           */
-    /* ------------------------------------------------------------------ */
     function limparMarcadores() {
         gMarkers.forEach(m => m.setMap(null));
         gMarkers = [];
@@ -202,9 +189,6 @@
         gMarkers.push(marker);
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Busca e renderização                                                 */
-    /* ------------------------------------------------------------------ */
     async function buscarAgencias() {
         const q  = document.getElementById('search-input').value.trim();
         const uf = document.getElementById('filter-estado').value;
@@ -217,14 +201,12 @@
             const res    = await fetch('/api/agencias?' + params.toString());
             let agencias = await res.json();
 
-            // Filtro segmento
             const segsSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
                 .filter(cb => cb.checked && ['Varejo','Empresa','Agronegócio','Estilo','Governo'].includes(cb.value))
                 .map(cb => cb.value);
             if (segsSel.length < 5)
                 agencias = agencias.filter(ag => !ag.segmento || segsSel.includes(ag.segmento));
 
-            // Filtro status
             const statusSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
                 .filter(cb => cb.checked && ['Operação Normal','Em Reforma','Fechada'].includes(cb.value))
                 .map(cb => cb.value);
@@ -269,12 +251,10 @@
         limparMarcadores();
         agencias.forEach(ag => adicionarMarcador(ag));
 
-        // Ajusta bounds para mostrar todos os marcadores
         if (gMarkers.length > 0) {
             const bounds = new google.maps.LatLngBounds();
             gMarkers.forEach(m => bounds.extend(m.getPosition()));
             gMap.fitBounds(bounds, { padding: 60 });
-            // Não deixa zoom muito alto para 1 marcador
             const listener = google.maps.event.addListener(gMap, 'idle', () => {
                 if (gMap.getZoom() > 14) gMap.setZoom(14);
                 google.maps.event.removeListener(listener);
@@ -289,9 +269,6 @@
         return 'badge-consulta';
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Filtros de região / estado                                           */
-    /* ------------------------------------------------------------------ */
     function updateStates() {
         const regiao = document.getElementById('filter-regiao').value;
         const sel    = document.getElementById('filter-estado');
@@ -309,9 +286,6 @@
         }
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Toggle painel de filtros                                             */
-    /* ------------------------------------------------------------------ */
     const filtersPanel = document.getElementById('filters-panel');
     const toggleBtn    = document.getElementById('toggle-filters');
     const toggleIcon   = toggleBtn.querySelector('i');
@@ -321,15 +295,11 @@
         toggleBtn.classList.toggle('collapsed');
         toggleIcon.classList.toggle('fa-chevron-left');
         toggleIcon.classList.toggle('fa-chevron-right');
-        // Força o Google Maps a recalcular o tamanho
         setTimeout(() => {
             if (gMap) google.maps.event.trigger(gMap, 'resize');
         }, 320);
     });
 
-    /* ------------------------------------------------------------------ */
-    /* Alternar mapa / lista                                                */
-    /* ------------------------------------------------------------------ */
     function switchView(view) {
         document.getElementById('map-view').style.display  = view === 'map'  ? 'block' : 'none';
         document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
@@ -339,14 +309,10 @@
             setTimeout(() => google.maps.event.trigger(gMap, 'resize'), 50);
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Enter na busca                                                       */
-    /* ------------------------------------------------------------------ */
     document.getElementById('search-input').addEventListener('keypress', e => {
         if (e.key === 'Enter') buscarAgencias();
     });
 </script>
 
-<!-- Google Maps carregado por último; callback=initMap dispara a inicialização -->
 <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&loading=async" async defer></script>
 {% endblock %}

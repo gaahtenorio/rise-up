@@ -1,9 +1,3 @@
-/**
- * Busca agências no endpoint interno do servidor.
- * @param {string} filtro - Texto livre (nome, prefixo ou cidade)
- * @param {string} uf     - Sigla do estado (ex: "PE")
- * @returns {Promise<Array>}
- */
 async function getAgencias(filtro = '', uf = '') {
     try {
         const params = new URLSearchParams();
@@ -24,11 +18,6 @@ async function getAgencias(filtro = '', uf = '') {
     }
 }
 
-/**
- * Formata o endereço completo de uma agência.
- * @param {Object} agencia
- * @returns {string}
- */
 function formatAddress(agencia) {
     const partes = [
         agencia.logradouro,
