@@ -99,8 +99,8 @@ body.login-page {
 .input-field input {
     width: 100%;
     padding: 13px 14px 13px 42px;
-    background: rgba(255,255,255,0.35);
-    border: 2px solid transparent;
+    background: rgba(0, 56, 168, 0.08);
+    border: 2px solid rgba(0, 56, 168, 0.2);
     border-radius: 10px;
     font-size: 0.95rem;
     color: var(--bb-blue);
@@ -109,12 +109,12 @@ body.login-page {
     transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.input-field input::placeholder { color: rgba(0,56,168,0.45); }
+.input-field input::placeholder { color: rgba(0,56,168,0.4); }
 
 .input-field input:focus {
-    background: var(--white);
+    background: rgba(0, 56, 168, 0.13);
     border-color: var(--bb-blue);
-    box-shadow: 0 0 0 4px rgba(0,56,168,0.12);
+    box-shadow: 0 0 0 4px rgba(0,56,168,0.15);
 }
 
 /* Links */
