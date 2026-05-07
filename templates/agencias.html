@@ -71,6 +71,18 @@
             </div>
         </div>
 
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-university"></i> Classificação BACEN</label>
+            <select class="filter-select" id="filter-classificacao-bacen">
+                <option value="">Todas</option>
+                <option value="Agência">Agência</option>
+                <option value="Posto de Atendimento Bancário (PAB)">Posto de Atendimento Bancário (PAB)</option>
+                <option value="Posto de Atendimento Eletrônico (PAE)">Posto de Atendimento Eletrônico (PAE)</option>
+                <option value="Unidade de Atendimento Bancário (UAB)">Unidade de Atendimento Bancário (UAB)</option>
+                <option value="Correspondente Bancário">Correspondente Bancário</option>
+            </select>
+        </div>
+
         <button class="btn-apply-filters" id="btn-aplicar-filtros" onclick="buscarAgencias()">
             <i class="fas fa-filter"></i> Aplicar Filtros
         </button>
@@ -101,7 +113,26 @@
         <div id="resultado-count" style="padding:8px 16px;font-size:.85rem;color:var(--text-muted);"></div>
 
         <div id="map-view" class="view-container">
-            <div id="google-map-agencias" style="width:100%;height:100%;"></div>
+            <div id="google-map-agencias" style="width:100%;height:100%;position:relative;"></div>
+            <div id="map-legend" style="
+                position:absolute;
+                bottom:32px;
+                right:12px;
+                background:rgba(255,255,255,0.95);
+                border:1px solid #d1d5db;
+                border-radius:8px;
+                padding:10px 14px;
+                font-size:.8rem;
+                line-height:1.8;
+                box-shadow:0 2px 8px rgba(0,0,0,.15);
+                z-index:10;
+                pointer-events:none;
+            ">
+                <div style="font-weight:600;margin-bottom:4px;">Legenda — IDI</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#0038A8;margin-right:6px;vertical-align:middle;"></span>IDI ≥ Limiar (Normal)</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#E11D48;margin-right:6px;vertical-align:middle;"></span>IDI &lt; Limiar (Crítico)</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#6B7280;margin-right:6px;vertical-align:middle;"></span>IDI não informado</div>
+            </div>
         </div>
 
         <div id="list-view" class="view-container" style="display:none;">
@@ -113,12 +144,13 @@
                             <th>Nome da Unidade</th>
                             <th>Cidade / UF</th>
                             <th>Segmento</th>
+                            <th>Classificação BACEN</th>
                             <th>Status</th>
                             <th>Ação</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
-                        <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -131,6 +163,7 @@
 <script>
     let gMap;
     let gMarkers = [];
+    let gLimiarIDI = 3.0;
 
     const GMAPS_KEY = '{{ google_maps_key }}';
 
@@ -142,7 +175,7 @@
         'Sul':          ['PR','RS','SC']
     };
 
-    function initMap() {
+    async function initMap() {
         gMap = new google.maps.Map(document.getElementById('google-map-agencias'), {
             center: { lat: -14.235, lng: -51.925 },
             zoom: 4,
@@ -150,6 +183,17 @@
             streetViewControl: false,
             fullscreenControl: true
         });
+
+        // Fetch current limiar from API before loading markers
+        try {
+            const res = await fetch('/api/config/limiar-idi');
+            const data = await res.json();
+            if (data && data.limiar_idi != null) {
+                gLimiarIDI = parseFloat(data.limiar_idi);
+            }
+        } catch (e) {
+            console.warn('Não foi possível obter o limiar IDI; usando padrão 3.0', e);
+        }
 
         buscarAgencias();
     }
@@ -159,14 +203,41 @@
         gMarkers = [];
     }
 
-    function corPorStatus(status) {
-        if (status === 'Em Reforma') return '#f39c12';
-        if (status === 'Fechada')    return '#e11d48';
-        return '#0038A8';
+    /**
+     * Retorna a cor hex do marcador com base no IDI e no limiar configurado.
+     * - idi >= limiar → azul (#0038A8)
+     * - idi < limiar  → vermelho (#E11D48)
+     * - idi null/undefined → cinza (#6B7280)
+     */
+    function corPorIDI(idi, limiar) {
+        if (idi == null) return '#6B7280';
+        if (idi >= limiar) return '#0038A8';
+        return '#E11D48';
+    }
+
+    /**
+     * Recalcula as cores de todos os marcadores existentes sem recarregar a página.
+     * Deve ser chamada quando o limiar IDI for alterado.
+     */
+    function atualizarLimiarIDI(novoLimiar) {
+        gLimiarIDI = parseFloat(novoLimiar);
+        gMarkers.forEach(m => {
+            const cor = corPorIDI(m._idi, gLimiarIDI);
+            m.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 9,
+                fillColor: cor,
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+            });
+        });
     }
 
     function adicionarMarcador(ag) {
         if (!ag.lat || !ag.lng) return;
+
+        const cor = corPorIDI(ag.idi, gLimiarIDI);
 
         const marker = new google.maps.Marker({
             position: { lat: ag.lat, lng: ag.lng },
@@ -175,13 +246,27 @@
             icon: {
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 9,
-                fillColor: corPorStatus(ag.status),
+                fillColor: cor,
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
                 strokeWeight: 2
             }
         });
 
+        // Store IDI on the marker for later recalculation
+        marker._idi = ag.idi != null ? ag.idi : null;
+
+        const idiTexto = ag.idi != null ? `IDI: ${ag.idi}` : 'IDI não informado';
+        const infoWindow = new google.maps.InfoWindow({
+            content: `<div style="font-size:.9rem;line-height:1.5;">
+                <strong>${ag.nome}</strong><br>
+                Prefixo: ${ag.prefixo}<br>
+                ${idiTexto}
+            </div>`
+        });
+
+        marker.addListener('mouseover', () => infoWindow.open(gMap, marker));
+        marker.addListener('mouseout',  () => infoWindow.close());
         marker.addListener('click', () => {
             window.location.href = '/detalhes/' + ag.prefixo;
         });
@@ -192,10 +277,12 @@
     async function buscarAgencias() {
         const q  = document.getElementById('search-input').value.trim();
         const uf = document.getElementById('filter-estado').value;
+        const classificacaoBacen = document.getElementById('filter-classificacao-bacen').value;
 
         const params = new URLSearchParams();
         if (q)  params.append('q', q);
         if (uf) params.append('uf', uf);
+        if (classificacaoBacen) params.append('classificacao_bacen', classificacaoBacen);
 
         try {
             const res    = await fetch('/api/agencias?' + params.toString());
@@ -226,7 +313,7 @@
     function renderTabela(agencias) {
         const tbody = document.getElementById('table-body');
         if (!agencias.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma agência encontrada.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma agência encontrada.</td></tr>';
             return;
         }
         tbody.innerHTML = agencias.map(ag => `
@@ -235,6 +322,7 @@
                 <td>${ag.nome}</td>
                 <td class="text-muted">${ag.municipio} / ${ag.uf}</td>
                 <td>${ag.segmento || '-'}</td>
+                <td>${ag.classificacao_bacen || 'Não classificada'}</td>
                 <td><span class="badge ${badgeStatus(ag.status)}">${ag.status || '-'}</span></td>
                 <td>
                     <a href="/detalhes/${ag.prefixo}" class="btn btn-primary"

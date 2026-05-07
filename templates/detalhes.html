@@ -28,9 +28,6 @@
         <div>
             <div class="badge-row">
                 <span class="badge badge-blue">{{ agencia.segmento or 'VAREJO' }}</span>
-                {% if agencia.carbono %}
-                <span class="badge badge-esg"><i class="fas fa-leaf"></i> Selo ESG A+</span>
-                {% endif %}
             </div>
             <h1>{{ agencia.nome }}</h1>
             <p class="sub-info">
@@ -75,11 +72,12 @@
                 {% endif %}
             </h4>
         </div>
-        <div class="status-card esg">
-            <p>Créditos de Carbono</p>
-            <h4>
-                {% if agencia.carbono %}+{{ agencia.carbono }} ton/ano
-                {% else %}Não informado{% endif %}
+        <div class="status-card esg" id="card-idi">
+            <p>IDI</p>
+            <h4 id="idi-valor">
+                {% if agencia.idi is not none and agencia.idi is not none %}
+                {{ agencia.idi }}
+                {% else %}IDI não informado{% endif %}
             </h4>
         </div>
     </div>
@@ -108,6 +106,22 @@
                         <td>Telefone de Contato:</td>
                         <td>{{ agencia.telefone or 'Não informado' }}</td>
                     </tr>
+                    {% if agencia.email_agencia %}
+                    <tr>
+                        <td>E-mail da Agência:</td>
+                        <td>{{ agencia.email_agencia }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if agencia.cnpj %}
+                    <tr>
+                        <td>CNPJ:</td>
+                        <td>{{ agencia.cnpj }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Classificação BACEN:</td>
+                        <td>{{ agencia.classificacao_bacen or 'Não classificada' }}</td>
+                    </tr>
                     <tr>
                         <td>Acessibilidade:</td>
                         <td class="{% if agencia.acessibilidade %}text-success{% else %}text-warning{% endif %}">
@@ -121,38 +135,197 @@
             <div class="card">
                 <h3 class="card-title"><i class="fas fa-seedling"></i> Monitoramento de Recursos (ESG)</h3>
 
+                <!-- Ambiental -->
+                <h5 style="color:var(--color-green);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">
+                    <i class="fas fa-leaf"></i> Ambiental
+                </h5>
+
                 {% if agencia.consumo_energia %}
                 <div class="resource-item">
                     <div class="resource-header">
-                        <span><i class="fas fa-bolt"></i> Consumo de Energia</span>
+                        <span><i class="fas fa-bolt"></i> Energia</span>
                         <span class="fw-bold">{{ agencia.consumo_energia }} kWh <small>/mês</small></span>
                     </div>
                     <div class="resource-track">
                         <div class="resource-fill warning"
                              style="width:{{ [agencia.consumo_energia / 15, 100] | min }}%"></div>
                     </div>
-                    <small class="meta-label">Meta: Manter abaixo de 1.100 kWh</small>
                 </div>
                 {% else %}
-                <p class="text-muted" style="margin-bottom:12px;">
-                    <i class="fas fa-bolt"></i> Consumo de energia não informado.
+                <p class="text-muted" style="margin-bottom:10px;font-size:.85rem;">
+                    <i class="fas fa-bolt"></i> Energia: <em>Não informado</em>
                 </p>
                 {% endif %}
 
                 {% if agencia.consumo_agua %}
                 <div class="resource-item">
                     <div class="resource-header">
-                        <span><i class="fas fa-tint"></i> Consumo de Água</span>
+                        <span><i class="fas fa-tint"></i> Água</span>
                         <span class="fw-bold">{{ agencia.consumo_agua }} m³ <small>/mês</small></span>
                     </div>
                     <div class="resource-track">
                         <div class="resource-fill success"
                              style="width:{{ [agencia.consumo_agua / 1, 100] | min }}%"></div>
                     </div>
-                    <small class="meta-label">Meta: Manter abaixo de 50 m³</small>
                 </div>
                 {% else %}
-                <p class="text-muted"><i class="fas fa-tint"></i> Consumo de água não informado.</p>
+                <p class="text-muted" style="margin-bottom:10px;font-size:.85rem;">
+                    <i class="fas fa-tint"></i> Água: <em>Não informado</em>
+                </p>
+                {% endif %}
+
+                <table class="info-table" style="margin-bottom:16px;">
+                    <tr>
+                        <td><i class="fas fa-plug"></i> Eficiência Energética:</td>
+                        <td>
+                            {% if agencia.eficiencia_energetica is not none %}
+                            {{ agencia.eficiencia_energetica }} kWh/m²
+                            {% elif agencia.consumo_energia and agencia.area_util %}
+                            {{ (agencia.consumo_energia / agencia.area_util) | round(2) }} kWh/m²
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-trash-alt"></i> Resíduos Sólidos:</td>
+                        <td>
+                            {% if agencia.residuos_solidos is not none %}
+                            {{ agencia.residuos_solidos }} kg/mês
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Social -->
+                <h5 style="color:var(--bb-blue);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;margin-top:4px;">
+                    <i class="fas fa-users"></i> Social
+                </h5>
+                <table class="info-table" style="margin-bottom:16px;">
+                    <tr>
+                        <td><i class="fas fa-wheelchair"></i> Acessibilidade (NBR 9050):</td>
+                        <td class="{% if agencia.acessibilidade %}text-success{% endif %}">
+                            {% if agencia.acessibilidade %}Totalmente Adaptada
+                            {% else %}<em class="text-muted">Parcial / Não Adaptada</em>{% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-id-badge"></i> Nº de Colaboradores:</td>
+                        <td>
+                            {% if agencia.num_colaboradores is not none %}
+                            {{ agencia.num_colaboradores }}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Governança -->
+                <h5 style="color:var(--color-purple);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;margin-top:4px;">
+                    <i class="fas fa-landmark"></i> Governança
+                </h5>
+                <table class="info-table">
+                    <tr>
+                        <td><i class="fas fa-fire-extinguisher"></i> Última Vistoria Bombeiros:</td>
+                        <td>
+                            {% if agencia.data_ultima_vistoria_bombeiros %}
+                            {{ agencia.data_ultima_vistoria_bombeiros.strftime('%d/%m/%Y') }}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Seção Arquivos DWG -->
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-drafting-compass"></i> Arquivos DWG</h3>
+                <div id="dwg-loading" style="color:var(--text-muted);font-size:.85rem;">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando arquivos...
+                </div>
+                <div id="dwg-container" style="display:none;">
+                    <table class="data-table" id="dwg-tabela" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>Tamanho</th>
+                                <th>Data de Upload</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dwg-tbody"></tbody>
+                    </table>
+                    <p id="dwg-vazio" style="color:var(--text-muted);font-size:.85rem;display:none;">
+                        Nenhum arquivo DWG cadastrado.
+                    </p>
+                </div>
+                {% if user_level == 'Gestão' %}
+                <div style="margin-top:14px;">
+                    <label class="btn btn-ghost" style="cursor:pointer;">
+                        <i class="fas fa-upload"></i> Enviar DWG
+                        <input type="file" id="dwg-input-file" accept=".dwg"
+                               style="display:none;" onchange="uploadDWG(this)">
+                    </label>
+                    <span id="dwg-upload-msg" style="font-size:.82rem;margin-left:8px;"></span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Seção Horários SAA -->
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-clock"></i> Horários SAA</h3>
+                <div id="saa-loading" style="color:var(--text-muted);font-size:.85rem;">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando horários...
+                </div>
+                <div id="saa-container" style="display:none;">
+                    <table class="data-table" id="saa-tabela" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Dia da Semana</th>
+                                <th>Abertura</th>
+                                <th>Encerramento</th>
+                                {% if user_level == 'Gestão' %}<th>Ações</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody id="saa-tbody"></tbody>
+                    </table>
+                    <p id="saa-vazio" style="color:var(--text-muted);font-size:.85rem;display:none;">
+                        Horários de funcionamento da SAA não informados.
+                    </p>
+                </div>
+                {% if user_level == 'Gestão' %}
+                <div style="margin-top:14px;border-top:1px solid var(--border-color);padding-top:14px;">
+                    <h5 style="font-size:.82rem;font-weight:700;color:var(--bb-blue);margin-bottom:10px;">
+                        Adicionar Horário
+                    </h5>
+                    <div class="form-grid cols-3" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label class="form-label">Dia</label>
+                            <select class="form-input" id="saa-input-dia">
+                                <option value="">Selecione...</option>
+                                {% for dia in ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'] %}
+                                <option value="{{ dia }}">{{ dia }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Abertura</label>
+                            <input type="time" class="form-input" id="saa-input-abertura">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Encerramento</label>
+                            <input type="time" class="form-input" id="saa-input-encerramento">
+                        </div>
+                    </div>
+                    <div id="saa-form-msg" class="form-msg" style="display:none;"></div>
+                    <button class="btn btn-primary" onclick="adicionarHorarioSAA()" style="margin-top:4px;">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -190,8 +363,96 @@
                 <ul class="doc-list">
                     <li><a href="#"><i class="fas fa-file-download"></i> Planta Baixa.pdf</a></li>
                     <li><a href="#"><i class="fas fa-file-download"></i> Alvará de Funcionamento.pdf</a></li>
-                    <li><a href="#"><i class="fas fa-file-download"></i> Laudo Bombeiros.pdf</a></li>
                 </ul>
+
+                <!-- Vistoria Corpo de Bombeiros (dinâmico) -->
+                <div id="vistoria-container" style="margin-top:16px;">
+                    <div id="vistoria-loading" style="color:var(--text-muted);font-size:.85rem;">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando vistoria...
+                    </div>
+                    <div id="vistoria-dados" style="display:none;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                            <i class="fas fa-fire-extinguisher" style="color:var(--color-red);"></i>
+                            <strong style="font-size:.9rem;">Laudo de Vistoria — Corpo de Bombeiros</strong>
+                            <span id="vistoria-badge-vencida" class="badge"
+                                  style="display:none;background:#fee2e2;color:#991b1b;">
+                                Vistoria Vencida
+                            </span>
+                        </div>
+                        <table class="info-table" style="margin-bottom:10px;">
+                            <tr>
+                                <td>Protocolo:</td>
+                                <td id="vistoria-protocolo">—</td>
+                            </tr>
+                            <tr>
+                                <td>Data de Emissão:</td>
+                                <td id="vistoria-emissao">—</td>
+                            </tr>
+                            <tr>
+                                <td>Data de Validade:</td>
+                                <td id="vistoria-validade">—</td>
+                            </tr>
+                        </table>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn btn-outline" id="btn-download-vistoria"
+                                    onclick="downloadVistoria()" style="display:none;">
+                                <i class="fas fa-file-download"></i> Baixar PDF
+                            </button>
+                            {% if user_level == 'Gestão' %}
+                            <button class="btn btn-ghost" onclick="abrirFormVistoria()">
+                                <i class="fas fa-edit"></i> Atualizar Vistoria
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div id="vistoria-vazia" style="display:none;">
+                        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:8px;">
+                            <i class="fas fa-fire-extinguisher"></i> Vistoria não cadastrada.
+                        </p>
+                        {% if user_level == 'Gestão' %}
+                        <button class="btn btn-ghost" onclick="abrirFormVistoria()">
+                            <i class="fas fa-plus"></i> Cadastrar Vistoria
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if user_level == 'Gestão' %}
+                <!-- Formulário inline de vistoria -->
+                <div id="form-vistoria-container" style="display:none;margin-top:16px;border-top:1px solid var(--border-color);padding-top:16px;">
+                    <h5 style="font-size:.85rem;font-weight:700;color:var(--bb-blue);margin-bottom:12px;">
+                        Cadastrar / Atualizar Vistoria
+                    </h5>
+                    <div class="form-grid cols-2" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Protocolo *</label>
+                            <input type="text" class="form-input" id="vistoria-input-protocolo"
+                                   placeholder="Ex.: 2024/001234">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Data de Emissão *</label>
+                            <input type="date" class="form-input" id="vistoria-input-emissao">
+                        </div>
+                    </div>
+                    <div class="form-grid cols-2" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Data de Validade</label>
+                            <input type="date" class="form-input" id="vistoria-input-validade">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">PDF da Vistoria</label>
+                            <input type="file" class="form-input" id="vistoria-input-pdf" accept=".pdf">
+                        </div>
+                    </div>
+                    <div id="form-vistoria-msg" class="form-msg" style="display:none;"></div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+                        <button type="button" class="btn btn-ghost" onclick="fecharFormVistoria()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="salvarVistoria()">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -308,7 +569,7 @@
                            value="{{ agencia.lng or '' }}">
                 </div>
             </div>
-            <div class="form-grid cols-3" style="margin-bottom:16px;">
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
                 <div class="form-group">
                     <label class="form-label">Energia (kWh/mês)</label>
                     <input type="number" step="any" class="form-input" id="edit-energia"
@@ -319,10 +580,59 @@
                     <input type="number" step="any" class="form-input" id="edit-agua"
                            value="{{ agencia.consumo_agua or '' }}">
                 </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
                 <div class="form-group">
-                    <label class="form-label">Carbono (ton/ano)</label>
-                    <input type="number" step="any" class="form-input" id="edit-carbono"
-                           value="{{ agencia.carbono or '' }}">
+                    <label class="form-label">Área Útil (m²)</label>
+                    <input type="number" step="any" class="form-input" id="edit-area-util"
+                           value="{{ agencia.area_util or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
+                    <input type="number" step="any" class="form-input" id="edit-eficiencia"
+                           value="{{ agencia.eficiencia_energetica or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Resíduos Sólidos (kg/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-residuos"
+                           value="{{ agencia.residuos_solidos or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nº de Colaboradores</label>
+                    <input type="number" step="1" class="form-input" id="edit-colaboradores"
+                           value="{{ agencia.num_colaboradores or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">IDI (1,0 – 10,0)</label>
+                    <input type="number" step="0.1" min="1" max="10" class="form-input" id="edit-idi"
+                           value="{{ agencia.idi or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Classificação BACEN</label>
+                    <select class="form-input" id="edit-classificacao-bacen">
+                        <option value="">— Não classificada —</option>
+                        {% for cls in ['Agência','Posto de Atendimento Bancário (PAB)','Posto de Atendimento Eletrônico (PAE)','Unidade de Atendimento Bancário (UAB)','Correspondente Bancário'] %}
+                        <option value="{{ cls }}"
+                            {% if agencia.classificacao_bacen == cls %}selected{% endif %}>{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">E-mail da Agência</label>
+                    <input type="email" class="form-input" id="edit-email-agencia"
+                           value="{{ agencia.email_agencia or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CNPJ</label>
+                    <input type="text" class="form-input" id="edit-cnpj"
+                           value="{{ agencia.cnpj or '' }}"
+                           placeholder="XX.XXX.XXX/XXXX-XX">
                 </div>
             </div>
             <div id="form-edicao-msg" class="form-msg" style="display:none;"></div>
@@ -364,7 +674,14 @@ async function salvarEdicao(e) {
         lng:             document.getElementById('edit-lng').value   || null,
         consumo_energia: document.getElementById('edit-energia').value || null,
         consumo_agua:    document.getElementById('edit-agua').value    || null,
-        carbono:         document.getElementById('edit-carbono').value || null,
+        area_util:            document.getElementById('edit-area-util').value || null,
+        eficiencia_energetica: document.getElementById('edit-eficiencia').value || null,
+        residuos_solidos:     document.getElementById('edit-residuos').value || null,
+        num_colaboradores:    document.getElementById('edit-colaboradores').value || null,
+        idi:                  document.getElementById('edit-idi').value || null,
+        classificacao_bacen:  document.getElementById('edit-classificacao-bacen').value || null,
+        email_agencia:        document.getElementById('edit-email-agencia').value.trim() || null,
+        cnpj:                 document.getElementById('edit-cnpj').value.trim() || null,
     };
     try {
         const res  = await fetch('/api/agencias/{{ agencia.id }}', {
@@ -679,6 +996,311 @@ async function salvarEdicao(e) {
         if (!e.target.closest('.detalhes-search-bar')) hideDropdown();
     });
 })();
+</script>
+
+<script>
+// ─── IDI: busca limiar e aplica indicação visual ───────────────────────────
+const AGENCIA_ID = {{ agencia.id }};
+
+(async function carregarIDI() {
+    try {
+        const res = await fetch('/api/config/limiar-idi');
+        const cfg = await res.json();
+        const limiar = cfg.limiar_idi || 3.0;
+        const idi = {{ agencia.idi if agencia.idi is not none else 'null' }};
+        const card = document.getElementById('card-idi');
+        const h4   = document.getElementById('idi-valor');
+        if (idi === null) {
+            h4.textContent = 'IDI não informado';
+        } else {
+            h4.textContent = idi.toFixed(1);
+            if (idi < limiar) {
+                card.classList.add('critico');
+                card.style.borderLeftColor = 'var(--color-red)';
+                h4.style.color = 'var(--color-red)';
+            }
+        }
+    } catch(e) { console.error('Erro ao carregar limiar IDI:', e); }
+})();
+
+// ─── DWG ──────────────────────────────────────────────────────────────────
+function formatarTamanho(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toLocaleString('pt-BR', {maximumFractionDigits:1}) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toLocaleString('pt-BR', {maximumFractionDigits:1}) + ' KB';
+    return bytes + ' B';
+}
+
+async function carregarDWG() {
+    const loading   = document.getElementById('dwg-loading');
+    const container = document.getElementById('dwg-container');
+    const tabela    = document.getElementById('dwg-tabela');
+    const vazio     = document.getElementById('dwg-vazio');
+    const tbody     = document.getElementById('dwg-tbody');
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg');
+        const data = await res.json();
+        loading.style.display   = 'none';
+        container.style.display = 'block';
+        if (!data.length) {
+            vazio.style.display = 'block';
+            return;
+        }
+        tabela.style.display = 'table';
+        tbody.innerHTML = data.map(f => `
+            <tr>
+                <td><i class="fas fa-file" style="color:var(--bb-blue);margin-right:6px;"></i>${escHtml(f.nome_original)}</td>
+                <td>${formatarTamanho(f.tamanho_bytes)}</td>
+                <td>${f.enviado_em}</td>
+                <td>
+                    <a href="/api/agencias/${AGENCIA_ID}/dwg/${f.id}/download"
+                       class="btn btn-outline" style="padding:6px 12px;font-size:.78rem;">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    {% if user_level == 'Gestão' %}
+                    <button class="btn-icon delete" onclick="excluirDWG(${f.id})" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+        `).join('');
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar arquivos.';
+        console.error(e);
+    }
+}
+
+async function uploadDWG(input) {
+    const msg = document.getElementById('dwg-upload-msg');
+    if (!input.files.length) return;
+    const file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.dwg')) {
+        msg.textContent = 'Apenas arquivos DWG são aceitos.';
+        msg.style.color = 'var(--color-red)';
+        input.value = '';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('arquivo', file);
+    msg.textContent = 'Enviando...';
+    msg.style.color = 'var(--text-muted)';
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao enviar.';
+            msg.style.color = 'var(--color-red)';
+        } else {
+            msg.textContent = 'Enviado com sucesso!';
+            msg.style.color = 'var(--color-green)';
+            input.value = '';
+            await carregarDWG();
+        }
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.style.color = 'var(--color-red)';
+    }
+}
+
+async function excluirDWG(id) {
+    if (!confirm('Excluir este arquivo DWG?')) return;
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg/' + id, { method: 'DELETE' });
+        if (res.ok) await carregarDWG();
+        else { const d = await res.json(); alert(d.erro || 'Erro ao excluir.'); }
+    } catch(e) { alert('Erro de conexão.'); }
+}
+
+// ─── SAA ──────────────────────────────────────────────────────────────────
+async function carregarSAA() {
+    const loading   = document.getElementById('saa-loading');
+    const container = document.getElementById('saa-container');
+    const tabela    = document.getElementById('saa-tabela');
+    const vazio     = document.getElementById('saa-vazio');
+    const tbody     = document.getElementById('saa-tbody');
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios');
+        const data = await res.json();
+        loading.style.display   = 'none';
+        container.style.display = 'block';
+        if (!data.length) {
+            vazio.style.display = 'block';
+            return;
+        }
+        tabela.style.display = 'table';
+        tbody.innerHTML = data.map(h => `
+            <tr>
+                <td>${escHtml(h.dia_semana)}</td>
+                <td>${h.hora_abertura}</td>
+                <td>${h.hora_encerramento}</td>
+                {% if user_level == 'Gestão' %}
+                <td>
+                    <button class="btn-icon delete" onclick="excluirHorario(${h.id})" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+                {% endif %}
+            </tr>
+        `).join('');
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar horários.';
+        console.error(e);
+    }
+}
+
+async function adicionarHorarioSAA() {
+    const dia   = document.getElementById('saa-input-dia').value;
+    const aber  = document.getElementById('saa-input-abertura').value;
+    const enc   = document.getElementById('saa-input-encerramento').value;
+    const msg   = document.getElementById('saa-form-msg');
+    if (!dia || !aber || !enc) {
+        msg.textContent = 'Preencha todos os campos.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+        return;
+    }
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dia_semana: dia, hora_abertura: aber, hora_encerramento: enc })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+        } else {
+            msg.style.display = 'none';
+            document.getElementById('saa-input-dia').value = '';
+            document.getElementById('saa-input-abertura').value = '';
+            document.getElementById('saa-input-encerramento').value = '';
+            await carregarSAA();
+        }
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+
+async function excluirHorario(id) {
+    if (!confirm('Excluir este horário?')) return;
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios/' + id, { method: 'DELETE' });
+        if (res.ok) await carregarSAA();
+        else { const d = await res.json(); alert(d.erro || 'Erro ao excluir.'); }
+    } catch(e) { alert('Erro de conexão.'); }
+}
+
+// ─── Vistoria Bombeiros ────────────────────────────────────────────────────
+async function carregarVistoria() {
+    const loading = document.getElementById('vistoria-loading');
+    const dados   = document.getElementById('vistoria-dados');
+    const vazia   = document.getElementById('vistoria-vazia');
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria');
+        loading.style.display = 'none';
+        if (res.status === 404) {
+            vazia.style.display = 'block';
+            return;
+        }
+        const v = await res.json();
+        dados.style.display = 'block';
+        document.getElementById('vistoria-protocolo').textContent = v.protocolo || '—';
+        document.getElementById('vistoria-emissao').textContent   = v.data_emissao
+            ? new Date(v.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        document.getElementById('vistoria-validade').textContent  = v.data_validade
+            ? new Date(v.data_validade + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        if (v.vencida) {
+            document.getElementById('vistoria-badge-vencida').style.display = 'inline-block';
+        }
+        if (v.nome_original) {
+            document.getElementById('btn-download-vistoria').style.display = 'inline-flex';
+        }
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar vistoria.';
+        console.error(e);
+    }
+}
+
+function downloadVistoria() {
+    window.location.href = '/api/agencias/' + AGENCIA_ID + '/vistoria/download';
+}
+
+{% if user_level == 'Gestão' %}
+function abrirFormVistoria() {
+    document.getElementById('form-vistoria-container').style.display = 'block';
+}
+function fecharFormVistoria() {
+    document.getElementById('form-vistoria-container').style.display = 'none';
+}
+
+async function salvarVistoria() {
+    const protocolo  = document.getElementById('vistoria-input-protocolo').value.trim();
+    const emissao    = document.getElementById('vistoria-input-emissao').value;
+    const validade   = document.getElementById('vistoria-input-validade').value;
+    const pdfInput   = document.getElementById('vistoria-input-pdf');
+    const msg        = document.getElementById('form-vistoria-msg');
+
+    if (!protocolo || !emissao) {
+        msg.textContent = 'Protocolo e data de emissão são obrigatórios.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+        return;
+    }
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ protocolo, data_emissao: emissao, data_validade: validade || null })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+            return;
+        }
+        // Upload PDF if selected
+        if (pdfInput.files.length) {
+            const fd = new FormData();
+            fd.append('arquivo', pdfInput.files[0]);
+            const resUp = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria/upload', { method: 'POST', body: fd });
+            if (!resUp.ok) {
+                const dUp = await resUp.json();
+                msg.textContent = dUp.erro || 'Vistoria salva, mas erro no upload do PDF.';
+                msg.className   = 'form-msg form-msg-erro';
+                msg.style.display = 'block';
+                await carregarVistoria();
+                return;
+            }
+        }
+        fecharFormVistoria();
+        // Reset hidden vistoria-dados/vazia before reload
+        document.getElementById('vistoria-dados').style.display = 'none';
+        document.getElementById('vistoria-vazia').style.display = 'none';
+        document.getElementById('vistoria-loading').style.display = 'block';
+        await carregarVistoria();
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+{% endif %}
+
+// ─── Utilitários ──────────────────────────────────────────────────────────
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Inicialização ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    carregarDWG();
+    carregarSAA();
+    carregarVistoria();
+});
 </script>
 
 {% if agencia.lat and agencia.lng %}

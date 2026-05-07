@@ -189,7 +189,7 @@
                 </div>
             </div>
 
-            <div class="form-grid cols-3" style="margin-top:16px;">
+            <div class="form-grid cols-2" style="margin-top:16px;">
                 <div class="form-group">
                     <label class="form-label">Consumo Energia (kWh/mês)</label>
                     <input type="number" step="any" class="form-input" id="ag-energia" placeholder="1240">
@@ -198,9 +198,56 @@
                     <label class="form-label">Consumo Água (m³/mês)</label>
                     <input type="number" step="any" class="form-input" id="ag-agua" placeholder="42">
                 </div>
+            </div>
+
+            <div class="form-grid cols-3" style="margin-top:16px;">
                 <div class="form-group">
-                    <label class="form-label">Créditos de Carbono (ton/ano)</label>
-                    <input type="number" step="any" class="form-input" id="ag-carbono" placeholder="12.5">
+                    <label class="form-label">Área Útil (m²)</label>
+                    <input type="number" step="any" class="form-input" id="ag-area-util" placeholder="350">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
+                    <input type="number" step="any" class="form-input" id="ag-eficiencia-energetica" placeholder="3.54">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resíduos Sólidos (kg/mês)</label>
+                    <input type="number" step="any" class="form-input" id="ag-residuos-solidos" placeholder="80">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">IDI (1,0 – 10,0)</label>
+                    <input type="number" step="0.1" min="1" max="10" class="form-input" id="ag-idi" placeholder="7.5">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nº de Colaboradores</label>
+                    <input type="number" step="1" min="0" class="form-input" id="ag-num-colaboradores" placeholder="25">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">E-mail da Agência</label>
+                    <input type="email" class="form-input" id="ag-email-agencia" placeholder="agencia@bb.com.br">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CNPJ</label>
+                    <input type="text" class="form-input" id="ag-cnpj" placeholder="00.000.000/0000-00">
+                </div>
+            </div>
+
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Classificação BACEN</label>
+                    <select class="form-input" id="ag-classificacao-bacen">
+                        <option value="">Não classificada</option>
+                        <option value="Agência">Agência</option>
+                        <option value="Posto de Atendimento Bancário (PAB)">Posto de Atendimento Bancário (PAB)</option>
+                        <option value="Posto de Atendimento Eletrônico (PAE)">Posto de Atendimento Eletrônico (PAE)</option>
+                        <option value="Unidade de Atendimento Bancário (UAB)">Unidade de Atendimento Bancário (UAB)</option>
+                        <option value="Correspondente Bancário">Correspondente Bancário</option>
+                    </select>
                 </div>
             </div>
 
@@ -233,12 +280,14 @@
                         <th>Nome</th>
                         <th>Município / UF</th>
                         <th>Segmento</th>
+                        <th>IDI</th>
+                        <th>Classificação BACEN</th>
                         <th>Status</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tbody-agencias-admin">
-                    <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -400,20 +449,20 @@ let agenciasAdmin = [];
 
 async function carregarAgenciasAdmin() {
     const tbody = document.getElementById('tbody-agencias-admin');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr>';
     try {
         const res  = await fetch('/api/agencias');
         agenciasAdmin = await res.json();
         renderAgenciasAdmin(agenciasAdmin);
     } catch(err) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Erro ao carregar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Erro ao carregar.</td></tr>';
     }
 }
 
 function renderAgenciasAdmin(lista) {
     const tbody = document.getElementById('tbody-agencias-admin');
     if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma agência cadastrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhuma agência cadastrada.</td></tr>';
         return;
     }
     tbody.innerHTML = lista.map(ag => `
@@ -422,6 +471,8 @@ function renderAgenciasAdmin(lista) {
             <td>${ag.nome}</td>
             <td class="text-muted">${ag.municipio} / ${ag.uf}</td>
             <td>${ag.segmento || '-'}</td>
+            <td>${ag.idi != null ? ag.idi : '-'}</td>
+            <td>${ag.classificacao_bacen || 'Não classificada'}</td>
             <td><span class="badge ${badgeStatus(ag.status)}">${ag.status || '-'}</span></td>
             <td class="text-center">
                 <button class="btn-icon edit" onclick="preencherFormAgencia(${ag.id})" aria-label="Editar"><i class="fas fa-edit"></i></button>
@@ -472,7 +523,14 @@ function preencherFormAgencia(id) {
     document.getElementById('ag-lng').value         = ag.lng || '';
     document.getElementById('ag-energia').value     = ag.consumo_energia || '';
     document.getElementById('ag-agua').value        = ag.consumo_agua || '';
-    document.getElementById('ag-carbono').value     = ag.carbono || '';
+    document.getElementById('ag-area-util').value              = ag.area_util != null ? ag.area_util : '';
+    document.getElementById('ag-eficiencia-energetica').value  = ag.eficiencia_energetica != null ? ag.eficiencia_energetica : '';
+    document.getElementById('ag-residuos-solidos').value       = ag.residuos_solidos != null ? ag.residuos_solidos : '';
+    document.getElementById('ag-idi').value                    = ag.idi != null ? ag.idi : '';
+    document.getElementById('ag-num-colaboradores').value      = ag.num_colaboradores != null ? ag.num_colaboradores : '';
+    document.getElementById('ag-email-agencia').value          = ag.email_agencia || '';
+    document.getElementById('ag-cnpj').value                   = ag.cnpj || '';
+    document.getElementById('ag-classificacao-bacen').value    = ag.classificacao_bacen || '';
     document.getElementById('btn-salvar-texto').textContent = 'Atualizar Agência';
     document.querySelector('.admin-card .admin-card-title').textContent = 'Editando: ' + ag.nome;
     document.getElementById('form-agencia').scrollIntoView({ behavior: 'smooth' });
@@ -507,9 +565,16 @@ async function salvarAgencia(e) {
         acessibilidade:  document.getElementById('ag-acessibilidade').value === 'true',
         lat:             document.getElementById('ag-lat').value || null,
         lng:             document.getElementById('ag-lng').value || null,
-        consumo_energia: document.getElementById('ag-energia').value || null,
-        consumo_agua:    document.getElementById('ag-agua').value || null,
-        carbono:         document.getElementById('ag-carbono').value || null,
+        consumo_energia:        document.getElementById('ag-energia').value || null,
+        consumo_agua:           document.getElementById('ag-agua').value || null,
+        area_util:              document.getElementById('ag-area-util').value || null,
+        eficiencia_energetica:  document.getElementById('ag-eficiencia-energetica').value || null,
+        residuos_solidos:       document.getElementById('ag-residuos-solidos').value || null,
+        idi:                    document.getElementById('ag-idi').value || null,
+        num_colaboradores:      document.getElementById('ag-num-colaboradores').value || null,
+        email_agencia:          document.getElementById('ag-email-agencia').value.trim() || null,
+        cnpj:                   document.getElementById('ag-cnpj').value.trim() || null,
+        classificacao_bacen:    document.getElementById('ag-classificacao-bacen').value || null,
     };
 
     const url    = id ? `/api/agencias/${id}` : '/api/agencias';

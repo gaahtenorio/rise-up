@@ -1,11 +1,14 @@
 import os
+import re
 import json
+import uuid
 from functools import wraps
 from flask import (Flask, render_template, redirect, url_for,
-                   session, request, abort, jsonify, flash)
+                   session, request, abort, jsonify, flash, send_file)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from werkzeug.utils import secure_filename
+from datetime import datetime, date
 
 
 app = Flask(__name__)
@@ -17,8 +20,23 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'sqlite:///' + os.path.join(BASE_DIR, 'disec.db')
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
+
+# Garante que os diretórios de upload existam na inicialização
+os.makedirs(os.path.join(BASE_DIR, 'uploads', 'dwg'), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, 'uploads', 'bombeiros'), exist_ok=True)
 
 db = SQLAlchemy(app)
+
+CLASSIFICACOES_BACEN = [
+    'Agência',
+    'Posto de Atendimento Bancário (PAB)',
+    'Posto de Atendimento Eletrônico (PAE)',
+    'Unidade de Atendimento Bancário (UAB)',
+    'Correspondente Bancário',
+]
+DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
 
 class Usuario(db.Model):
@@ -74,8 +92,22 @@ class Agencia(db.Model):
     consumo_agua    = db.Column(db.Float, nullable=True)
     carbono         = db.Column(db.Float, nullable=True)
     acessibilidade  = db.Column(db.Boolean, default=True)
+    # Novos campos
+    eficiencia_energetica          = db.Column(db.Float, nullable=True)
+    area_util                      = db.Column(db.Float, nullable=True)
+    idi                            = db.Column(db.Float, nullable=True)
+    residuos_solidos               = db.Column(db.Float, nullable=True)
+    num_colaboradores              = db.Column(db.Integer, nullable=True)
+    data_ultima_vistoria_bombeiros = db.Column(db.Date, nullable=True)
+    email_agencia                  = db.Column(db.String(120), nullable=True)
+    cnpj                           = db.Column(db.String(20), nullable=True)
+    classificacao_bacen            = db.Column(db.String(60), nullable=True)
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Relacionamentos
+    arquivos_dwg       = db.relationship('ArquivoDWG', back_populates='agencia', cascade='all, delete-orphan')
+    horarios_saa       = db.relationship('HorarioSAA', back_populates='agencia', cascade='all, delete-orphan')
+    vistoria_bombeiros = db.relationship('VistoriaBombeiros', back_populates='agencia', uselist=False, cascade='all, delete-orphan')
 
     @property
     def endereco(self):
@@ -104,12 +136,110 @@ class Agencia(db.Model):
             'lng':              self.lng,
             'consumo_energia':  self.consumo_energia,
             'consumo_agua':     self.consumo_agua,
-            'carbono':          self.carbono,
             'acessibilidade':   self.acessibilidade,
+            'eficiencia_energetica':          self.eficiencia_energetica,
+            'area_util':                      self.area_util,
+            'idi':                            self.idi,
+            'residuos_solidos':               self.residuos_solidos,
+            'num_colaboradores':              self.num_colaboradores,
+            'data_ultima_vistoria_bombeiros': self.data_ultima_vistoria_bombeiros.strftime('%d/%m/%Y') if self.data_ultima_vistoria_bombeiros else None,
+            'email_agencia':                  self.email_agencia,
+            'cnpj':                           self.cnpj,
+            'classificacao_bacen':            self.classificacao_bacen,
             'endereco':         self.endereco,
             'cidade':           self.municipio,
             'estado':           self.uf,
         }
+
+
+class ArquivoDWG(db.Model):
+    __tablename__ = 'arquivos_dwg'
+    id            = db.Column(db.Integer, primary_key=True)
+    agencia_id    = db.Column(db.Integer, db.ForeignKey('agencias.id', ondelete='CASCADE'), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    nome_arquivo  = db.Column(db.String(255), nullable=False)  # UUID + extensão no disco
+    tamanho_bytes = db.Column(db.Integer, nullable=False)
+    enviado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+    agencia       = db.relationship('Agencia', back_populates='arquivos_dwg')
+
+
+class HorarioSAA(db.Model):
+    __tablename__ = 'horarios_saa'
+    id            = db.Column(db.Integer, primary_key=True)
+    agencia_id    = db.Column(db.Integer, db.ForeignKey('agencias.id', ondelete='CASCADE'), nullable=False)
+    dia_semana    = db.Column(db.String(20), nullable=False)   # 'Segunda', 'Terça', ..., 'Domingo'
+    hora_abertura = db.Column(db.String(5),  nullable=False)   # 'HH:MM'
+    hora_encerramento = db.Column(db.String(5), nullable=False)
+    agencia       = db.relationship('Agencia', back_populates='horarios_saa')
+
+
+class VistoriaBombeiros(db.Model):
+    __tablename__ = 'vistorias_bombeiros'
+    id              = db.Column(db.Integer, primary_key=True)
+    agencia_id      = db.Column(db.Integer, db.ForeignKey('agencias.id', ondelete='CASCADE'), nullable=False, unique=True)
+    protocolo       = db.Column(db.String(100), nullable=False)
+    data_emissao    = db.Column(db.Date, nullable=False)
+    data_validade   = db.Column(db.Date, nullable=True)
+    nome_arquivo    = db.Column(db.String(255), nullable=True)   # UUID no disco
+    nome_original   = db.Column(db.String(255), nullable=True)   # nome original do PDF
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    agencia         = db.relationship('Agencia', back_populates='vistoria_bombeiros')
+
+
+class ConfiguracaoSistema(db.Model):
+    __tablename__ = 'configuracoes_sistema'
+    id    = db.Column(db.Integer, primary_key=True)
+    chave = db.Column(db.String(100), unique=True, nullable=False)
+    valor = db.Column(db.String(255), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Funções auxiliares de validação e cálculo
+# ---------------------------------------------------------------------------
+
+def calcular_eficiencia_energetica(consumo_energia, area_util):
+    """Calcula eficiência energética em kWh/m².
+    Retorna round(consumo / area, 2) ou None se area_util for zero/None.
+    """
+    if not area_util:
+        return None
+    return round(consumo_energia / area_util, 2)
+
+
+def validar_idi(valor):
+    """Retorna True se 1.0 <= valor <= 10.0."""
+    try:
+        v = float(valor)
+        return 1.0 <= v <= 10.0
+    except (TypeError, ValueError):
+        return False
+
+
+def validar_cnpj_formato(cnpj):
+    """Valida formato XX.XXX.XXX/XXXX-XX."""
+    if not cnpj:
+        return False
+    return bool(re.match(r'^\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}$', cnpj))
+
+
+def cor_marcador_idi(idi, limiar):
+    """Retorna cor hex para marcador de mapa baseado no IDI.
+    - None -> '#6B7280' (cinza)
+    - idi >= limiar -> '#0038A8' (azul)
+    - idi < limiar -> '#E11D48' (vermelho)
+    """
+    if idi is None:
+        return '#6B7280'
+    if idi >= limiar:
+        return '#0038A8'
+    return '#E11D48'
+
+
+def is_vistoria_vencida(data_validade, data_atual):
+    """Retorna True se data_validade < data_atual."""
+    if data_validade is None:
+        return False
+    return data_validade < data_atual
 
 
 def seed_db():
@@ -166,6 +296,10 @@ def seed_db():
             db.session.commit()
         except (FileNotFoundError, json.JSONDecodeError):
             pass
+
+    if not ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first():
+        db.session.add(ConfiguracaoSistema(chave='limiar_idi', valor='3.0'))
+        db.session.commit()
 
 
 def login_required(f):
@@ -319,6 +453,9 @@ def api_agencias():
         )
     if uf:
         query = query.filter_by(uf=uf)
+    classificacao_bacen = request.args.get('classificacao_bacen', '').strip()
+    if classificacao_bacen:
+        query = query.filter_by(classificacao_bacen=classificacao_bacen)
 
     agencias = query.order_by(Agencia.nome).all()
     return jsonify([ag.to_dict() for ag in agencias])
@@ -349,6 +486,23 @@ def api_agencias_criar():
     if Agencia.query.filter_by(prefixo=prefixo).first():
         return jsonify({'erro': f'Prefixo {prefixo} já cadastrado'}), 409
 
+    # Validate CNPJ format if provided
+    cnpj = data.get('cnpj')
+    if cnpj and not validar_cnpj_formato(cnpj):
+        return jsonify({'erro': 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX.'}), 400
+
+    # Validate IDI range if provided
+    idi = data.get('idi')
+    if idi is not None and idi != '':
+        try:
+            idi = float(idi)
+            if not validar_idi(idi):
+                return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
+        except (TypeError, ValueError):
+            return jsonify({'erro': 'IDI deve ser um número'}), 400
+    else:
+        idi = None
+
     ag = Agencia(
         prefixo=prefixo, nome=nome, municipio=municipio, uf=uf,
         logradouro=data.get('logradouro'), numero=data.get('numero'),
@@ -359,8 +513,15 @@ def api_agencias_criar():
         lat=data.get('lat') or None, lng=data.get('lng') or None,
         consumo_energia=data.get('consumo_energia') or None,
         consumo_agua=data.get('consumo_agua') or None,
-        carbono=data.get('carbono') or None,
         acessibilidade=bool(data.get('acessibilidade', True)),
+        email_agencia=data.get('email_agencia') or None,
+        cnpj=cnpj or None,
+        area_util=float(data['area_util']) if data.get('area_util') not in (None, '') else None,
+        idi=idi,
+        eficiencia_energetica=float(data['eficiencia_energetica']) if data.get('eficiencia_energetica') not in (None, '') else None,
+        residuos_solidos=float(data['residuos_solidos']) if data.get('residuos_solidos') not in (None, '') else None,
+        num_colaboradores=int(data['num_colaboradores']) if data.get('num_colaboradores') not in (None, '') else None,
+        classificacao_bacen=data.get('classificacao_bacen') or None,
     )
     db.session.add(ag)
     db.session.commit()
@@ -391,10 +552,36 @@ def api_agencias_editar(agencia_id):
         ag.consumo_energia = float(data['consumo_energia']) if data['consumo_energia'] not in (None, '') else None
     if 'consumo_agua' in data:
         ag.consumo_agua = float(data['consumo_agua']) if data['consumo_agua'] not in (None, '') else None
-    if 'carbono' in data:
-        ag.carbono = float(data['carbono']) if data['carbono'] not in (None, '') else None
     if 'acessibilidade' in data:
         ag.acessibilidade = bool(data['acessibilidade'])
+    if 'email_agencia' in data:
+        ag.email_agencia = str(data['email_agencia']).strip() or None
+    if 'cnpj' in data:
+        cnpj = str(data['cnpj']).strip() if data['cnpj'] else None
+        if cnpj and not validar_cnpj_formato(cnpj):
+            return jsonify({'erro': 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX.'}), 400
+        ag.cnpj = cnpj
+    if 'area_util' in data:
+        ag.area_util = float(data['area_util']) if data['area_util'] not in (None, '') else None
+    if 'idi' in data:
+        if data['idi'] not in (None, ''):
+            try:
+                idi_val = float(data['idi'])
+                if not validar_idi(idi_val):
+                    return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
+                ag.idi = idi_val
+            except (TypeError, ValueError):
+                return jsonify({'erro': 'IDI deve ser um número'}), 400
+        else:
+            ag.idi = None
+    if 'eficiencia_energetica' in data:
+        ag.eficiencia_energetica = float(data['eficiencia_energetica']) if data['eficiencia_energetica'] not in (None, '') else None
+    if 'residuos_solidos' in data:
+        ag.residuos_solidos = float(data['residuos_solidos']) if data['residuos_solidos'] not in (None, '') else None
+    if 'num_colaboradores' in data:
+        ag.num_colaboradores = int(data['num_colaboradores']) if data['num_colaboradores'] not in (None, '') else None
+    if 'classificacao_bacen' in data:
+        ag.classificacao_bacen = str(data['classificacao_bacen']).strip() or None
 
     ag.atualizado_em = datetime.utcnow()
     db.session.commit()
@@ -408,6 +595,367 @@ def api_agencias_deletar(agencia_id):
     db.session.delete(ag)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@app.route('/api/agencias/<int:agencia_id>/dwg', methods=['GET'])
+@login_required
+def api_dwg_listar(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    arquivos = ArquivoDWG.query.filter_by(agencia_id=agencia_id).order_by(ArquivoDWG.enviado_em.desc()).all()
+    return jsonify([{
+        'id':            a.id,
+        'nome_original': a.nome_original,
+        'tamanho_bytes': a.tamanho_bytes,
+        'enviado_em':    a.enviado_em.strftime('%d/%m/%Y') if a.enviado_em else '',
+    } for a in arquivos])
+
+
+@app.route('/api/agencias/<int:agencia_id>/dwg', methods=['POST'])
+@gestao_required
+def api_dwg_upload(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+
+    if 'arquivo' not in request.files:
+        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['arquivo']
+    if not arquivo.filename:
+        return jsonify({'erro': 'Nenhum arquivo selecionado'}), 400
+
+    # Validate extension against the original filename (before sanitization)
+    if not arquivo.filename.lower().endswith('.dwg'):
+        return jsonify({'erro': 'Apenas arquivos no formato DWG são aceitos.'}), 400
+
+    # Sanitize filename for storage; if secure_filename strips everything, fall back to uuid.dwg
+    nome_seguro = secure_filename(arquivo.filename)
+    if not nome_seguro or nome_seguro.lower() == 'dwg':
+        nome_seguro = f"{uuid.uuid4().hex}.dwg"
+
+    # Validate size (read content to check; MAX_CONTENT_LENGTH handles global limit)
+    conteudo = arquivo.read()
+    tamanho = len(conteudo)
+    if tamanho > 50 * 1024 * 1024:
+        return jsonify({'erro': 'O arquivo excede o limite de 50 MB.'}), 400
+
+    # Save file with UUID prefix
+    nome_uuid = f"{uuid.uuid4().hex}_{nome_seguro}"
+    pasta = os.path.join(app.config['UPLOAD_FOLDER'], 'dwg', str(agencia_id))
+    os.makedirs(pasta, exist_ok=True)
+    caminho = os.path.join(pasta, nome_uuid)
+    with open(caminho, 'wb') as f:
+        f.write(conteudo)
+
+    registro = ArquivoDWG(
+        agencia_id=agencia_id,
+        nome_original=arquivo.filename,
+        nome_arquivo=nome_uuid,
+        tamanho_bytes=tamanho,
+    )
+    db.session.add(registro)
+    db.session.commit()
+
+    return jsonify({
+        'id':            registro.id,
+        'nome_original': registro.nome_original,
+        'tamanho_bytes': registro.tamanho_bytes,
+        'enviado_em':    registro.enviado_em.strftime('%d/%m/%Y') if registro.enviado_em else '',
+    }), 201
+
+
+@app.route('/api/agencias/<int:agencia_id>/dwg/<int:dwg_id>/download', methods=['GET'])
+@login_required
+def api_dwg_download(agencia_id, dwg_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    arquivo = ArquivoDWG.query.filter_by(id=dwg_id, agencia_id=agencia_id).first_or_404()
+    caminho = os.path.join(app.config['UPLOAD_FOLDER'], 'dwg', str(agencia_id), arquivo.nome_arquivo)
+    if not os.path.exists(caminho):
+        return jsonify({'erro': 'Arquivo não encontrado no servidor'}), 404
+    return send_file(
+        caminho,
+        as_attachment=True,
+        download_name=arquivo.nome_original,
+    )
+
+
+@app.route('/api/agencias/<int:agencia_id>/dwg/<int:dwg_id>', methods=['DELETE'])
+@gestao_required
+def api_dwg_deletar(agencia_id, dwg_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    arquivo = ArquivoDWG.query.filter_by(id=dwg_id, agencia_id=agencia_id).first_or_404()
+    # Remove physical file
+    caminho = os.path.join(app.config['UPLOAD_FOLDER'], 'dwg', str(agencia_id), arquivo.nome_arquivo)
+    if os.path.exists(caminho):
+        os.remove(caminho)
+    db.session.delete(arquivo)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/agencias/<int:agencia_id>/horarios', methods=['GET'])
+@login_required
+def api_horarios_listar(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    # Order by DIAS_SEMANA index
+    horarios = HorarioSAA.query.filter_by(agencia_id=agencia_id).all()
+    def ordem_dia(h):
+        try:
+            return DIAS_SEMANA.index(h.dia_semana)
+        except ValueError:
+            return 99
+    horarios_sorted = sorted(horarios, key=ordem_dia)
+    return jsonify([{
+        'id':               h.id,
+        'dia_semana':       h.dia_semana,
+        'hora_abertura':    h.hora_abertura,
+        'hora_encerramento': h.hora_encerramento,
+    } for h in horarios_sorted])
+
+
+@app.route('/api/agencias/<int:agencia_id>/horarios', methods=['POST'])
+@gestao_required
+def api_horarios_criar(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({'erro': 'Dados inválidos'}), 400
+
+    dia_semana = str(data.get('dia_semana', '')).strip()
+    hora_abertura = str(data.get('hora_abertura', '')).strip()
+    hora_encerramento = str(data.get('hora_encerramento', '')).strip()
+
+    if not all([dia_semana, hora_abertura, hora_encerramento]):
+        return jsonify({'erro': 'Dia da semana, hora de abertura e hora de encerramento são obrigatórios'}), 400
+
+    if dia_semana not in DIAS_SEMANA:
+        return jsonify({'erro': f'Dia da semana inválido. Use: {", ".join(DIAS_SEMANA)}'}), 400
+
+    # Validate temporal order
+    if hora_encerramento <= hora_abertura:
+        return jsonify({'erro': 'O horário de encerramento deve ser posterior ao horário de abertura.'}), 400
+
+    horario = HorarioSAA(
+        agencia_id=agencia_id,
+        dia_semana=dia_semana,
+        hora_abertura=hora_abertura,
+        hora_encerramento=hora_encerramento,
+    )
+    db.session.add(horario)
+    db.session.commit()
+    return jsonify({
+        'id':               horario.id,
+        'dia_semana':       horario.dia_semana,
+        'hora_abertura':    horario.hora_abertura,
+        'hora_encerramento': horario.hora_encerramento,
+    }), 201
+
+
+@app.route('/api/agencias/<int:agencia_id>/horarios/<int:h_id>', methods=['PUT'])
+@gestao_required
+def api_horarios_editar(agencia_id, h_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    horario = HorarioSAA.query.filter_by(id=h_id, agencia_id=agencia_id).first_or_404()
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({'erro': 'Dados inválidos'}), 400
+
+    hora_abertura = str(data.get('hora_abertura', horario.hora_abertura)).strip()
+    hora_encerramento = str(data.get('hora_encerramento', horario.hora_encerramento)).strip()
+    dia_semana = str(data.get('dia_semana', horario.dia_semana)).strip()
+
+    if dia_semana not in DIAS_SEMANA:
+        return jsonify({'erro': f'Dia da semana inválido. Use: {", ".join(DIAS_SEMANA)}'}), 400
+
+    if hora_encerramento <= hora_abertura:
+        return jsonify({'erro': 'O horário de encerramento deve ser posterior ao horário de abertura.'}), 400
+
+    horario.dia_semana = dia_semana
+    horario.hora_abertura = hora_abertura
+    horario.hora_encerramento = hora_encerramento
+    db.session.commit()
+    return jsonify({
+        'id':               horario.id,
+        'dia_semana':       horario.dia_semana,
+        'hora_abertura':    horario.hora_abertura,
+        'hora_encerramento': horario.hora_encerramento,
+    })
+
+
+@app.route('/api/agencias/<int:agencia_id>/horarios/<int:h_id>', methods=['DELETE'])
+@gestao_required
+def api_horarios_deletar(agencia_id, h_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    horario = HorarioSAA.query.filter_by(id=h_id, agencia_id=agencia_id).first_or_404()
+    db.session.delete(horario)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/agencias/<int:agencia_id>/vistoria', methods=['GET'])
+@login_required
+def api_vistoria_get(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    v = ag.vistoria_bombeiros
+    if not v:
+        return jsonify({'erro': 'Vistoria não cadastrada'}), 404
+    return jsonify({
+        'id':            v.id,
+        'protocolo':     v.protocolo,
+        'data_emissao':  v.data_emissao.strftime('%Y-%m-%d') if v.data_emissao else None,
+        'data_validade': v.data_validade.strftime('%Y-%m-%d') if v.data_validade else None,
+        'nome_original': v.nome_original,
+        'atualizado_em': v.atualizado_em.strftime('%d/%m/%Y %H:%M') if v.atualizado_em else None,
+        'vencida':       is_vistoria_vencida(v.data_validade, date.today()) if v.data_validade else False,
+    })
+
+
+@app.route('/api/agencias/<int:agencia_id>/vistoria', methods=['POST'])
+@gestao_required
+def api_vistoria_upsert(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({'erro': 'Dados inválidos'}), 400
+
+    protocolo = str(data.get('protocolo', '')).strip()
+    data_emissao_str = str(data.get('data_emissao', '')).strip()
+
+    if not protocolo or not data_emissao_str:
+        return jsonify({'erro': 'Protocolo e data de emissão são obrigatórios'}), 400
+
+    try:
+        data_emissao = date.fromisoformat(data_emissao_str)
+    except ValueError:
+        return jsonify({'erro': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+
+    data_validade = None
+    data_validade_str = str(data.get('data_validade', '')).strip()
+    if data_validade_str:
+        try:
+            data_validade = date.fromisoformat(data_validade_str)
+        except ValueError:
+            return jsonify({'erro': 'Formato de data de validade inválido. Use YYYY-MM-DD'}), 400
+
+    # Upsert: update existing or create new
+    v = ag.vistoria_bombeiros
+    if v:
+        v.protocolo = protocolo
+        v.data_emissao = data_emissao
+        v.data_validade = data_validade
+        v.atualizado_em = datetime.utcnow()
+    else:
+        v = VistoriaBombeiros(
+            agencia_id=agencia_id,
+            protocolo=protocolo,
+            data_emissao=data_emissao,
+            data_validade=data_validade,
+        )
+        db.session.add(v)
+
+    db.session.commit()
+    return jsonify({
+        'id':            v.id,
+        'protocolo':     v.protocolo,
+        'data_emissao':  v.data_emissao.strftime('%Y-%m-%d') if v.data_emissao else None,
+        'data_validade': v.data_validade.strftime('%Y-%m-%d') if v.data_validade else None,
+        'nome_original': v.nome_original,
+        'atualizado_em': v.atualizado_em.strftime('%d/%m/%Y %H:%M') if v.atualizado_em else None,
+        'vencida':       is_vistoria_vencida(v.data_validade, date.today()) if v.data_validade else False,
+    }), 201
+
+
+@app.route('/api/agencias/<int:agencia_id>/vistoria/upload', methods=['POST'])
+@gestao_required
+def api_vistoria_upload(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    v = ag.vistoria_bombeiros
+    if not v:
+        return jsonify({'erro': 'Cadastre a vistoria antes de fazer upload do PDF'}), 400
+
+    if 'arquivo' not in request.files:
+        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['arquivo']
+    if not arquivo.filename:
+        return jsonify({'erro': 'Nenhum arquivo selecionado'}), 400
+
+    nome_seguro = secure_filename(arquivo.filename)
+    if not nome_seguro.lower().endswith('.pdf'):
+        return jsonify({'erro': 'Apenas arquivos PDF são aceitos.'}), 400
+
+    conteudo = arquivo.read()
+    tamanho = len(conteudo)
+    if tamanho > 20 * 1024 * 1024:
+        return jsonify({'erro': 'O arquivo excede o limite de 20 MB.'}), 400
+
+    # Remove old file if exists
+    if v.nome_arquivo:
+        caminho_antigo = os.path.join(app.config['UPLOAD_FOLDER'], 'bombeiros', str(agencia_id), v.nome_arquivo)
+        if os.path.exists(caminho_antigo):
+            os.remove(caminho_antigo)
+
+    nome_uuid = f"{uuid.uuid4().hex}_{nome_seguro}"
+    pasta = os.path.join(app.config['UPLOAD_FOLDER'], 'bombeiros', str(agencia_id))
+    os.makedirs(pasta, exist_ok=True)
+    caminho = os.path.join(pasta, nome_uuid)
+    with open(caminho, 'wb') as f:
+        f.write(conteudo)
+
+    v.nome_arquivo = nome_uuid
+    v.nome_original = arquivo.filename
+    v.atualizado_em = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'ok': True, 'nome_original': v.nome_original}), 200
+
+
+@app.route('/api/agencias/<int:agencia_id>/vistoria/download', methods=['GET'])
+@login_required
+def api_vistoria_download(agencia_id):
+    ag = Agencia.query.get_or_404(agencia_id)
+    v = ag.vistoria_bombeiros
+    if not v or not v.nome_arquivo:
+        return jsonify({'erro': 'Nenhum PDF de vistoria cadastrado'}), 404
+    caminho = os.path.join(app.config['UPLOAD_FOLDER'], 'bombeiros', str(agencia_id), v.nome_arquivo)
+    if not os.path.exists(caminho):
+        return jsonify({'erro': 'Arquivo não encontrado no servidor'}), 404
+    return send_file(
+        caminho,
+        as_attachment=True,
+        download_name=v.nome_original,
+    )
+
+
+@app.route('/api/config/limiar-idi', methods=['GET'])
+@login_required
+def api_config_limiar_idi_get():
+    config = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
+    limiar = float(config.valor) if config else 3.0
+    return jsonify({'limiar_idi': limiar})
+
+
+@app.route('/api/config/limiar-idi', methods=['PUT'])
+@gestao_required
+def api_config_limiar_idi_put():
+    data = request.get_json(force=True)
+    if not data or 'limiar' not in data:
+        return jsonify({'erro': 'Campo limiar é obrigatório'}), 400
+
+    try:
+        limiar = float(data['limiar'])
+    except (TypeError, ValueError):
+        return jsonify({'erro': 'O limiar deve ser um número'}), 400
+
+    if not (1.0 <= limiar <= 9.9):
+        return jsonify({'erro': 'O limiar deve estar entre 1,0 e 9,9.'}), 400
+
+    config = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
+    if config:
+        config.valor = str(limiar)
+    else:
+        config = ConfiguracaoSistema(chave='limiar_idi', valor=str(limiar))
+        db.session.add(config)
+    db.session.commit()
+    return jsonify({'limiar_idi': limiar})
 
 
 @app.route('/api/usuarios')
