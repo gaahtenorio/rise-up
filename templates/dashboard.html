@@ -4,89 +4,268 @@
 {% block content %}
 <div class="welcome-section">
     <h1>Dashboard Estratégico</h1>
-    <p>Acompanhe em tempo real os indicadores de infraestrutura e sustentabilidade do <strong>Portal DISEC</strong>.</p>
+    <p>Visão consolidada dos indicadores de infraestrutura e sustentabilidade do <strong>Portal DISEC</strong>.</p>
 </div>
 
+{# ── Linha 1: Cards de status operacional ─────────────────────────────── #}
 <div class="stats-row">
     <div class="stat-card">
-        <div class="stat-icon yellow"><i class="fas fa-tools"></i></div>
+        <div class="stat-icon blue"><i class="fas fa-landmark"></i></div>
         <div class="stat-data">
-            <span class="stat-value">{{ stats.em_reforma if stats else '0' }}</span>
-            <span class="stat-label">Agências em Reforma</span>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon blue"><i class="fas fa-building"></i></div>
-        <div class="stat-data">
-            <span class="stat-value">{{ stats.total if stats else '0' }}</span>
+            <span class="stat-value">{{ stats.total }}</span>
             <span class="stat-label">Total de Agências</span>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon green"><i class="fas fa-tint"></i></div>
+        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
         <div class="stat-data">
-            <span class="stat-value">42 <small style="font-size:.6em">m³</small></span>
-            <span class="stat-label">Consumo de Água</span>
+            <span class="stat-value">{{ stats.operando }}</span>
+            <span class="stat-label">Em Operação Normal</span>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon purple"><i class="fas fa-leaf"></i></div>
+        <div class="stat-icon yellow"><i class="fas fa-tools"></i></div>
         <div class="stat-data">
-            <span class="stat-value">94%</span>
-            <span class="stat-label">Meta ESG Alcançada</span>
+            <span class="stat-value">{{ stats.em_reforma }}</span>
+            <span class="stat-label">Em Reforma</span>
+        </div>
+    </div>
+    <div class="stat-card {% if stats.idi_critico > 0 %}danger{% endif %}">
+        <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="stat-data">
+            <span class="stat-value">{{ stats.idi_critico }}</span>
+            <span class="stat-label">IDI Crítico (&lt; {{ stats.limiar_idi }})</span>
         </div>
     </div>
 </div>
 
+{# ── Linha 2: Cards ESG ───────────────────────────────────────────────── #}
+<div class="stats-row" style="margin-top:0;">
+    <div class="stat-card">
+        <div class="stat-icon yellow"><i class="fas fa-bolt"></i></div>
+        <div class="stat-data">
+            <span class="stat-value">{{ stats.total_energia }} <small style="font-size:.55em">MWh</small></span>
+            <span class="stat-label">Consumo Energia / mês</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-tint"></i></div>
+        <div class="stat-data">
+            <span class="stat-value">{{ "{:,.0f}".format(stats.total_agua).replace(",", ".") }} <small style="font-size:.55em">m³</small></span>
+            <span class="stat-label">Consumo Água / mês</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-users"></i></div>
+        <div class="stat-data">
+            <span class="stat-value">{{ stats.total_colab }}</span>
+            <span class="stat-label">Total de Colaboradores</span>
+        </div>
+    </div>
+    <div class="stat-card {% if stats.vencidas > 0 %}danger{% endif %}">
+        <div class="stat-icon red"><i class="fas fa-fire-extinguisher"></i></div>
+        <div class="stat-data">
+            <span class="stat-value">{{ stats.vencidas }}</span>
+            <span class="stat-label">Vistorias Vencidas</span>
+        </div>
+    </div>
+</div>
+
+{# ── Grid principal ───────────────────────────────────────────────────── #}
 <div class="dashboard-grid">
+
+    {# Mapa #}
     <div class="chart-box">
         <div class="chart-box-header">
-            <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica das Agências</h3>
-            <p>Todas as unidades cadastradas — <span style="color:#0038A8;">●</span> Normal &nbsp;
-               <span style="color:#f39c12;">●</span> Em Reforma &nbsp;
-               <span style="color:#e11d48;">●</span> Fechada</p>
+            <h3><i class="fas fa-map-marked-alt"></i> Distribuição Geográfica — IDI</h3>
+            <p>
+                <span style="color:#0038A8;">●</span> IDI ≥ {{ stats.limiar_idi }} (Normal) &nbsp;
+                <span style="color:#E11D48;">●</span> IDI &lt; {{ stats.limiar_idi }} (Crítico) &nbsp;
+                <span style="color:#6B7280;">●</span> IDI não informado
+            </p>
         </div>
         <div id="map-container" class="map-render"></div>
     </div>
 
+    {# Coluna lateral #}
     <div class="side-charts">
+
+        {# IDI médio + top críticos #}
         <div class="chart-box">
             <div class="chart-box-header">
-                <h3>Eficiência Energética</h3>
-                <p>Consumo por Região (Ranking)</p>
+                <h3><i class="fas fa-tachometer-alt"></i> IDI — Índice de Disponibilidade</h3>
+                <p>Média geral e agências em situação crítica</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px;">
+                <div style="text-align:center;min-width:72px;">
+                    <div id="idi-medio-valor" style="font-size:2rem;font-weight:800;color:var(--bb-blue);line-height:1;">
+                        {{ stats.idi_medio if stats.idi_medio else '—' }}
+                    </div>
+                    <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">IDI médio</div>
+                </div>
+                <div style="flex:1;">
+                    <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-muted);margin-bottom:4px;">
+                        <span>Crítico ({{ stats.idi_critico }})</span>
+                        <span>Normal ({{ stats.total - stats.idi_critico }})</span>
+                    </div>
+                    <div style="height:8px;border-radius:4px;background:#f1f5f9;overflow:hidden;">
+                        {% if stats.total > 0 %}
+                        <div style="height:100%;width:{{ (stats.idi_critico / stats.total * 100)|round|int }}%;background:#E11D48;border-radius:4px;"></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% if stats.top_criticos %}
+            <table class="info-table" style="font-size:.8rem;">
+                <thead>
+                    <tr style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.4px;">
+                        <th style="padding:4px 6px;font-weight:600;">Agência</th>
+                        <th style="padding:4px 6px;font-weight:600;">UF</th>
+                        <th style="padding:4px 6px;font-weight:600;text-align:right;">IDI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for ag in stats.top_criticos %}
+                <tr>
+                    <td style="padding:5px 6px;">
+                        <a href="/detalhes/{{ ag.prefixo }}" style="color:var(--bb-blue);font-weight:600;text-decoration:none;">
+                            {{ ag.nome | replace('AGENCIA ', '') | title }}
+                        </a>
+                    </td>
+                    <td style="padding:5px 6px;color:var(--text-muted);">{{ ag.uf }}</td>
+                    <td style="padding:5px 6px;text-align:right;">
+                        <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:12px;font-weight:700;font-size:.78rem;">
+                            {{ ag.idi }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        {# Eficiência energética por UF #}
+        <div class="chart-box">
+            <div class="chart-box-header">
+                <h3><i class="fas fa-plug"></i> Eficiência Energética por UF</h3>
+                <p>Média kWh/m² — maiores consumos</p>
             </div>
             <div class="efficiency-rank">
+                {% set max_efic = stats.ranking_efic[0].media if stats.ranking_efic else 1 %}
+                {% for item in stats.ranking_efic %}
                 <div class="rank-item">
-                    <span class="region">Nordeste</span>
-                    <div class="progress-track"><div class="progress-fill fill-100"></div></div>
-                    <span class="value">1.2M kWh</span>
+                    <span class="region" style="min-width:28px;">{{ item.uf }}</span>
+                    <div class="progress-track">
+                        <div class="progress-fill"
+                             style="width:{{ (item.media / max_efic * 100)|round|int }}%;
+                                    background:{% if loop.index == 1 %}#E11D48{% elif loop.index == 2 %}#f97316{% else %}#0038A8{% endif %};">
+                        </div>
+                    </div>
+                    <span class="value">{{ item.media }} kWh/m²</span>
                 </div>
-                <div class="rank-item">
-                    <span class="region">Sudeste</span>
-                    <div class="progress-track"><div class="progress-fill fill-85"></div></div>
-                    <span class="value">2.5M kWh</span>
-                </div>
-                <div class="rank-item">
-                    <span class="region">Sul</span>
-                    <div class="progress-track"><div class="progress-fill fill-70"></div></div>
-                    <span class="value">3.1M kWh</span>
-                </div>
-                <div class="rank-item">
-                    <span class="region">Centro-Oeste</span>
-                    <div class="progress-track"><div class="progress-fill fill-55"></div></div>
-                    <span class="value">4.2M kWh</span>
-                </div>
+                {% endfor %}
             </div>
         </div>
 
-        <div class="chart-box">
-            <div class="chart-box-header">
-                <h3>Tendência Global</h3>
-                <p>Evolução do consumo (Últimos 4 meses)</p>
+    </div>
+</div>
+
+{# ── Segunda linha de gráficos ────────────────────────────────────────── #}
+<div class="dashboard-grid" style="margin-top:0;">
+
+    {# Distribuição por segmento #}
+    <div class="chart-box" style="min-height:0;">
+        <div class="chart-box-header">
+            <h3><i class="fas fa-layer-group"></i> Distribuição por Segmento</h3>
+            <p>Composição da carteira de agências</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div style="position:relative;width:140px;height:140px;flex-shrink:0;">
+                <canvas id="segChart"></canvas>
             </div>
-            <canvas id="trendChart" class="chart-canvas"></canvas>
+            <div style="flex:1;min-width:160px;">
+                {% set seg_cores = {'Varejo':'#0038A8','Empresa':'#1e293b','Agronegócio':'#16a34a','Agronegocio':'#16a34a','Estilo':'#7c3aed','Governo':'#0891b2'} %}
+                {% for seg, qtd in stats.segmentos.items() %}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:{{ seg_cores.get(seg, '#94a3b8') }};flex-shrink:0;"></span>
+                    <span style="font-size:.82rem;flex:1;">{{ seg }}</span>
+                    <span style="font-size:.82rem;font-weight:700;color:var(--bb-blue);">{{ qtd }}</span>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
+
+    {# Vistorias e acessibilidade #}
+    <div class="chart-box" style="min-height:0;">
+        <div class="chart-box-header">
+            <h3><i class="fas fa-shield-alt"></i> Conformidade e Segurança</h3>
+            <p>Vistorias do Corpo de Bombeiros e acessibilidade</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div style="text-align:center;padding:12px;background:#f8fafc;border-radius:8px;">
+                <div style="font-size:1.6rem;font-weight:800;color:{% if stats.vencidas > 0 %}#E11D48{% else %}#16a34a{% endif %};">
+                    {{ stats.vencidas }}
+                </div>
+                <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">Vistorias vencidas</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:#f8fafc;border-radius:8px;">
+                <div style="font-size:1.6rem;font-weight:800;color:var(--text-muted);">
+                    {{ stats.sem_vistoria }}
+                </div>
+                <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">Sem vistoria cadastrada</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px;">
+                <span><i class="fas fa-wheelchair" style="color:var(--bb-blue);"></i> Acessibilidade (NBR 9050)</span>
+                <span style="font-weight:700;">{{ stats.pct_acessivel }}%</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:#f1f5f9;overflow:hidden;">
+                <div style="height:100%;width:{{ stats.pct_acessivel }}%;background:#0038A8;border-radius:4px;"></div>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:3px;">
+                {{ stats.acessiveis }} de {{ stats.total }} agências totalmente adaptadas
+            </div>
+        </div>
+
+        <div style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px;">
+                <span><i class="fas fa-trash-alt" style="color:#16a34a;"></i> Resíduos Sólidos</span>
+                <span style="font-weight:700;">{{ "{:,.0f}".format(stats.total_residuos).replace(",", ".") }} kg/mês</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);">
+                Média: {{ (stats.total_residuos / stats.total)|round(1) if stats.total else 0 }} kg/mês por agência
+            </div>
+        </div>
+    </div>
+
+    {# Classificação BACEN #}
+    <div class="chart-box" style="min-height:0;">
+        <div class="chart-box-header">
+            <h3><i class="fas fa-university"></i> Classificação BACEN</h3>
+            <p>Tipos de unidade conforme Banco Central</p>
+        </div>
+        {% set bacen_cores = [
+            '#0038A8','#1e40af','#2563eb','#3b82f6','#93c5fd','#94a3b8'
+        ] %}
+        {% for cls, qtd in stats.bacen_dist.items() %}
+        {% set pct = (qtd / stats.total * 100)|round|int %}
+        <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:3px;">
+                <span style="color:var(--text-dark);">{{ cls }}</span>
+                <span style="font-weight:700;color:var(--bb-blue);">{{ qtd }}</span>
+            </div>
+            <div style="height:6px;border-radius:3px;background:#f1f5f9;overflow:hidden;">
+                <div style="height:100%;width:{{ pct }}%;background:{{ bacen_cores[loop.index0 % bacen_cores|length] }};border-radius:3px;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
 </div>
 {% endblock %}
 
@@ -94,98 +273,129 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    async function initMap() {
-        const map = new google.maps.Map(document.getElementById('map-container'), {
-            zoom: 4,
-            center: { lat: -14.235, lng: -51.925 },
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true
-        });
+// ── Mapa ──────────────────────────────────────────────────────────────────
+const LIMIAR_IDI = {{ stats.limiar_idi }};
 
-        const infoWindow = new google.maps.InfoWindow();
+function corPorIDI(idi, limiar) {
+    if (idi == null) return '#6B7280';
+    return idi >= limiar ? '#0038A8' : '#E11D48';
+}
 
-        function corPorStatus(status) {
-            if (status === 'Em Reforma') return '#f39c12';
-            if (status === 'Fechada')    return '#e11d48';
-            return '#0038A8';
-        }
+async function initMap() {
+    const map = new google.maps.Map(document.getElementById('map-container'), {
+        zoom: 4,
+        center: { lat: -14.235, lng: -51.925 },
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true
+    });
 
-        try {
-            const res      = await fetch('/api/agencias');
-            const agencias = await res.json();
+    const infoWindow = new google.maps.InfoWindow();
 
-            agencias.forEach(ag => {
-                if (!ag.lat || !ag.lng) return;
+    try {
+        const res      = await fetch('/api/agencias');
+        const agencias = await res.json();
 
-                const marker = new google.maps.Marker({
-                    position: { lat: ag.lat, lng: ag.lng },
-                    map,
-                    title: ag.nome,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: corPorStatus(ag.status),
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2
-                    }
-                });
+        agencias.forEach(ag => {
+            if (!ag.lat || !ag.lng) return;
 
-                marker.addListener('click', () => {
-                    infoWindow.setContent(`
-                        <div style="font-family:'Montserrat',sans-serif;min-width:190px;padding:4px 0;">
-                            <p style="font-weight:700;font-size:.9rem;margin:0 0 4px;color:#0038A8;">${ag.nome}</p>
-                            <p style="margin:0 0 2px;font-size:.8rem;color:#555;">
-                                <strong>Prefixo:</strong> ${ag.prefixo}
-                            </p>
-                            <p style="margin:0 0 2px;font-size:.8rem;color:#555;">
-                                <strong>Local:</strong> ${ag.municipio} / ${ag.uf}
-                            </p>
-                            <p style="margin:0 0 8px;font-size:.8rem;color:#555;">
-                                <strong>Status:</strong> ${ag.status}
-                            </p>
-                            <a href="/detalhes/${ag.prefixo}"
-                               style="display:inline-block;background:#0038A8;color:#fff;
-                                      padding:4px 10px;border-radius:5px;font-size:.78rem;
-                                      font-weight:600;text-decoration:none;">
-                                Ver Detalhes →
-                            </a>
-                        </div>
-                    `);
-                    infoWindow.open(map, marker);
-                });
+            const cor = corPorIDI(ag.idi, LIMIAR_IDI);
+            const marker = new google.maps.Marker({
+                position: { lat: ag.lat, lng: ag.lng },
+                map,
+                title: ag.nome,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: cor,
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2
+                }
             });
-        } catch(err) {
-            console.error('Erro ao carregar agências no mapa:', err);
-        }
-    }
 
-    const ctx = document.getElementById('trendChart').getContext('2d');
+            const idiTexto = ag.idi != null
+                ? `<strong>IDI:</strong> ${ag.idi} ${ag.idi < LIMIAR_IDI ? '<span style="color:#E11D48;font-weight:700;">⚠ Crítico</span>' : ''}`
+                : '<strong>IDI:</strong> não informado';
+
+            marker.addListener('click', () => {
+                infoWindow.setContent(`
+                    <div style="font-family:'Montserrat',sans-serif;min-width:200px;padding:4px 0;">
+                        <p style="font-weight:700;font-size:.9rem;margin:0 0 6px;color:#0038A8;">${ag.nome}</p>
+                        <p style="margin:0 0 2px;font-size:.8rem;color:#555;"><strong>Prefixo:</strong> ${ag.prefixo}</p>
+                        <p style="margin:0 0 2px;font-size:.8rem;color:#555;"><strong>Local:</strong> ${ag.municipio} / ${ag.uf}</p>
+                        <p style="margin:0 0 2px;font-size:.8rem;color:#555;"><strong>Status:</strong> ${ag.status}</p>
+                        <p style="margin:0 0 8px;font-size:.8rem;color:#555;">${idiTexto}</p>
+                        <a href="/detalhes/${ag.prefixo}"
+                           style="display:inline-block;background:#0038A8;color:#fff;
+                                  padding:4px 10px;border-radius:5px;font-size:.78rem;
+                                  font-weight:600;text-decoration:none;">
+                            Ver Detalhes →
+                        </a>
+                    </div>
+                `);
+                infoWindow.open(map, marker);
+            });
+        });
+    } catch(err) {
+        console.error('Erro ao carregar agências no mapa:', err);
+    }
+}
+
+// ── Gráfico de segmentos (donut) ──────────────────────────────────────────
+(function() {
+    const segData = {
+        {% for seg, qtd in stats.segmentos.items() %}
+        '{{ seg }}': {{ qtd }},
+        {% endfor %}
+    };
+    const coresSeg = {
+        'Varejo':      '#0038A8',
+        'Empresa':     '#1e293b',
+        'Agronegócio': '#16a34a',
+        'Agronegocio': '#16a34a',
+        'Estilo':      '#7c3aed',
+        'Governo':     '#0891b2',
+    };
+    const labels = Object.keys(segData);
+    const values = Object.values(segData);
+    const cores  = labels.map(l => coresSeg[l] || '#94a3b8');
+
+    const ctx = document.getElementById('segChart').getContext('2d');
     new Chart(ctx, {
-        type: 'line',
+        type: 'doughnut',
         data: {
-            labels: ['Jan', 'Fev', 'Mar', 'Abr'],
-            datasets: [{
-                label: 'Consumo Global',
-                data: [1300, 1250, 1280, 1240],
-                borderColor: '#0038A8',
-                backgroundColor: 'rgba(0,56,168,0.08)',
-                fill: true, tension: 0.4, pointRadius: 4, borderWidth: 3
-            }]
+            labels,
+            datasets: [{ data: values, backgroundColor: cores, borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { display: false },
-                x: { grid: { display: false } }
+            maintainAspectRatio: true,
+            cutout: '68%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.label}: ${ctx.raw} agência(s)`
+                    }
+                }
             }
         }
     });
+})();
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap&loading=async"
         async defer></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stat-card.danger {
+    border-left: 3px solid #E11D48;
+}
+.stat-card.danger .stat-value {
+    color: #E11D48;
+}
+</style>
 {% endblock %}

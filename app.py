@@ -283,8 +283,8 @@ def seed_db():
                     cep=ag.get('cep'),
                     telefone=ag.get('telefone'),
                     gerente=ag.get('gerente'),
-                    segmento=ag.get('segmento', 'Varejo'),
-                    status=ag.get('status', 'Operação Normal'),
+                    segmento=ag.get('segmento', 'Varejo').replace('Agronegocio', 'Agronegócio'),
+                    status=ag.get('status', 'Operação Normal').replace('Operacao Normal', 'Operação Normal'),
                     acessibilidade=ag.get('acessibilidade', True),
                     lat=ag.get('lat'),
                     lng=ag.get('lng'),
@@ -330,15 +330,98 @@ def get_template_context():
 
 
 def get_stats():
-    total           = Agencia.query.count()
-    em_reforma      = Agencia.query.filter_by(status='Em Reforma').count()
-    sem_coords      = Agencia.query.filter(
-                          db.or_(Agencia.lat == None, Agencia.lng == None)
-                      ).count()
+    from sqlalchemy import func as sqlfunc
+
+    agencias = Agencia.query.all()
+    total    = len(agencias)
+    hoje     = date.today()
+
+    # Status
+    em_reforma = sum(1 for a in agencias if a.status == 'Em Reforma')
+    fechadas   = sum(1 for a in agencias if a.status == 'Fechada')
+    operando   = sum(1 for a in agencias if a.status not in ('Em Reforma', 'Fechada'))
+
+    # IDI
+    limiar_cfg = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
+    limiar_idi = float(limiar_cfg.valor) if limiar_cfg else 3.0
+    com_idi    = [a for a in agencias if a.idi is not None]
+    idi_critico = sum(1 for a in com_idi if a.idi < limiar_idi)
+    idi_medio  = round(sum(a.idi for a in com_idi) / len(com_idi), 1) if com_idi else None
+
+    # ESG — Ambiental
+    com_energia = [a.consumo_energia for a in agencias if a.consumo_energia]
+    com_agua    = [a.consumo_agua    for a in agencias if a.consumo_agua]
+    com_efic    = [a.eficiencia_energetica for a in agencias if a.eficiencia_energetica]
+    com_res     = [a.residuos_solidos for a in agencias if a.residuos_solidos]
+    total_energia = round(sum(com_energia) / 1000, 1) if com_energia else 0   # MWh
+    total_agua    = round(sum(com_agua), 0) if com_agua else 0                 # m³
+    media_efic    = round(sum(com_efic) / len(com_efic), 2) if com_efic else None
+    total_residuos = round(sum(com_res), 0) if com_res else 0                  # kg
+
+    # ESG — Social
+    total_colab   = sum(a.num_colaboradores for a in agencias if a.num_colaboradores)
+    acessiveis    = sum(1 for a in agencias if a.acessibilidade)
+    pct_acessivel = round(acessiveis / total * 100) if total else 0
+
+    # Vistorias
+    com_vistoria  = [a for a in agencias if a.vistoria_bombeiros]
+    vencidas      = sum(
+        1 for a in com_vistoria
+        if a.vistoria_bombeiros.data_validade and a.vistoria_bombeiros.data_validade < hoje
+    )
+    sem_vistoria  = total - len(com_vistoria)
+
+    # Distribuição por segmento (normaliza acento)
+    segmentos = {}
+    for a in agencias:
+        seg = a.segmento or 'Varejo'
+        seg = seg.replace('Agronegocio', 'Agronegócio')  # normaliza legado sem acento
+        segmentos[seg] = segmentos.get(seg, 0) + 1
+
+    # Distribuição por classificação BACEN
+    bacen_dist = {}
+    for a in agencias:
+        cls = a.classificacao_bacen or 'Não classificada'
+        bacen_dist[cls] = bacen_dist.get(cls, 0) + 1
+
+    # Top 5 IDI mais críticos (com IDI preenchido, ordenado crescente)
+    criticos = sorted(com_idi, key=lambda a: a.idi)[:5]
+    top_criticos = [{'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
+                     'municipio': a.municipio, 'uf': a.uf} for a in criticos]
+
+    # Ranking eficiência energética por UF (top 5 piores = maior consumo/m²)
+    com_efic_ags = [(a.uf, a.eficiencia_energetica) for a in agencias if a.eficiencia_energetica]
+    uf_efic = {}
+    for uf, efic in com_efic_ags:
+        if uf not in uf_efic:
+            uf_efic[uf] = []
+        uf_efic[uf].append(efic)
+    ranking_efic = sorted(
+        [{'uf': uf, 'media': round(sum(v)/len(v), 2)} for uf, v in uf_efic.items()],
+        key=lambda x: x['media'], reverse=True
+    )[:6]
+
     return {
-        'total':      total,
-        'em_reforma': em_reforma,
-        'sem_coords': sem_coords,
+        'total':          total,
+        'em_reforma':     em_reforma,
+        'fechadas':       fechadas,
+        'operando':       operando,
+        'limiar_idi':     limiar_idi,
+        'idi_critico':    idi_critico,
+        'idi_medio':      idi_medio,
+        'total_energia':  total_energia,
+        'total_agua':     int(total_agua),
+        'media_efic':     media_efic,
+        'total_residuos': int(total_residuos),
+        'total_colab':    total_colab,
+        'pct_acessivel':  pct_acessivel,
+        'acessiveis':     acessiveis,
+        'vencidas':       vencidas,
+        'sem_vistoria':   sem_vistoria,
+        'segmentos':      segmentos,
+        'bacen_dist':     bacen_dist,
+        'top_criticos':   top_criticos,
+        'ranking_efic':   ranking_efic,
     }
 
 
@@ -376,10 +459,7 @@ def logout():
 def index():
     ctx = get_template_context()
     ctx['page_title'] = 'Página Inicial'
-    stats = get_stats()
-    ctx['total_agencias'] = stats['total']
-    ctx['em_reforma']     = stats['em_reforma']
-    ctx['sem_coords']     = stats['sem_coords']
+    ctx['stats']      = get_stats()
     return render_template('index.html', **ctx)
 
 
