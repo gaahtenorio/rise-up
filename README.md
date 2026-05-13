@@ -1,6 +1,6 @@
-# 🏦 Sistema DISEC — Gestão Nacional de Agências
+# Sistema DISEC — Gestão Nacional de Agências
 
-## 📌 Sobre o Projeto
+## Sobre o Projeto
 
 O **Sistema DISEC** é uma aplicação web desenvolvida em **Python + Flask** para gerenciamento nacional de agências bancárias, permitindo controle operacional, ambiental e documental das unidades.
 
@@ -17,7 +17,7 @@ O sistema oferece:
 
 ---
 
-# 🚀 Tecnologias Utilizadas
+# Tecnologias Utilizadas
 
 - Python 3
 - Flask
@@ -31,7 +31,7 @@ O sistema oferece:
 
 ---
 
-# 📂 Estrutura do Projeto
+# Estrutura do Projeto
 
 ```bash
 .
@@ -49,9 +49,9 @@ O sistema oferece:
 
 ---
 
-# ⚙️ Funcionalidades
+# Funcionalidades
 
-## 🔐 Autenticação e Controle de Acesso
+## Autenticação e Controle de Acesso
 
 O sistema possui autenticação baseada em sessão:
 
@@ -69,7 +69,7 @@ Rotas protegidas com:
 
 ---
 
-## 🏢 Gestão de Agências
+## Gestão de Agências
 
 Cada agência possui:
 
@@ -86,7 +86,7 @@ Cada agência possui:
 
 ---
 
-## 🌱 Indicadores ESG
+## Indicadores ESG
 
 O sistema monitora:
 
@@ -106,7 +106,7 @@ Eficiência = Consumo de Energia / Área Útil
 
 ---
 
-## 📊 Dashboard Estratégico
+## Dashboard Estratégico
 
 O dashboard apresenta:
 
@@ -122,7 +122,7 @@ O dashboard apresenta:
 
 ---
 
-## 🗂️ Upload de Arquivos DWG
+## Upload de Arquivos DWG
 
 O sistema permite:
 
@@ -138,7 +138,7 @@ O sistema permite:
 
 ---
 
-## 🚒 Gestão de Vistorias dos Bombeiros
+## Gestão de Vistorias dos Bombeiros
 
 Recursos disponíveis:
 
@@ -155,7 +155,7 @@ Recursos disponíveis:
 
 ---
 
-## 👥 Gestão de Usuários
+## Gestão de Usuários
 
 Administradores podem:
 
@@ -167,7 +167,7 @@ Administradores podem:
 
 ---
 
-# 🧠 Modelos do Banco de Dados
+# Modelos do Banco de Dados
 
 ## Usuario
 
@@ -195,7 +195,7 @@ Armazena parâmetros globais do sistema.
 
 ---
 
-# 🔌 API REST
+# API REST
 
 ## Agências
 
@@ -239,9 +239,9 @@ Armazena parâmetros globais do sistema.
 
 ---
 
-# 🛠️ Instalação
+# Instalação
 
-## 1️⃣ Clone o projeto
+## 1️ - Clone o projeto
 
 ```bash
 git clone https://github.com/seu-usuario/disec.git
@@ -250,7 +250,7 @@ cd disec
 
 ---
 
-## 2️⃣ Crie o ambiente virtual
+## 2️ - Crie o ambiente virtual
 
 ### Windows
 
@@ -268,7 +268,7 @@ source venv/bin/activate
 
 ---
 
-## 3️⃣ Instale as dependências
+## 3️ - Instale as dependências
 
 ```bash
 pip install -r requirements.txt
@@ -276,7 +276,7 @@ pip install -r requirements.txt
 
 ---
 
-## 4️⃣ Configure as variáveis de ambiente
+## 4️ - Configure as variáveis de ambiente
 
 ```env
 SECRET_KEY=sua_chave_secreta
@@ -287,14 +287,21 @@ DATABASE_URL=sqlite:///disec.db
 
 ---
 
-## 5️⃣ Execute o sistema
+## 5️ - Execute o sistema
 
 ```bash
 python app.py
 ```
 ---
 
-# 📈 Regras de Negócio
+## 🔐 Credenciais iniciais
+| Usuário | Senha | Nível |
+|--------|------|------|
+| visitante | abc | Consulta |
+
+---
+
+# Regras de Negócio
 
 ## IDI
 
@@ -316,7 +323,7 @@ XX.XXX.XXX/XXXX-XX
 
 ---
 
-# 🔒 Segurança
+# Segurança
 
 - Senhas armazenadas com hash (`werkzeug.security`)
 - Controle de sessão
@@ -326,7 +333,7 @@ XX.XXX.XXX/XXXX-XX
 
 ---
 
-# 📌 Melhorias Futuras
+# Melhorias Futuras
 
 - Integração com PostgreSQL
 - Docker
@@ -339,7 +346,7 @@ XX.XXX.XXX/XXXX-XX
 
 ---
 
-# 👨‍💻 Autor
+# Autor
 
 **Igor Barbosa**
 
@@ -347,6 +354,6 @@ Sistema desenvolvido para gestão estratégica e operacional de agências bancá
 
 ---
 
-# 📄 Licença
+# Licença
 
 Este projeto é destinado para uso interno e educacional.
