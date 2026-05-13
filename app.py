@@ -207,10 +207,10 @@ def calcular_eficiencia_energetica(consumo_energia, area_util):
 
 
 def validar_idi(valor):
-    """Retorna True se 1.0 <= valor <= 10.0."""
+    """Retorna True se 1.0 <= valor <= 5.0."""
     try:
         v = float(valor)
-        return 1.0 <= v <= 10.0
+        return 1.0 <= v <= 5.0
     except (TypeError, ValueError):
         return False
 
@@ -389,7 +389,45 @@ def get_stats():
     top_criticos = [{'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
                      'municipio': a.municipio, 'uf': a.uf} for a in criticos]
 
-    # Ranking eficiência energética por UF (top 5 piores = maior consumo/m²)
+    # Lista completa de IDI críticos (abaixo do limiar)
+    idi_critico_lista = [
+        {'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
+         'municipio': a.municipio, 'uf': a.uf, 'status': a.status}
+        for a in sorted(com_idi, key=lambda a: a.idi) if a.idi < limiar_idi
+    ]
+
+    # Lista de agências em reforma
+    em_reforma_lista = [
+        {'prefixo': a.prefixo, 'nome': a.nome, 'municipio': a.municipio,
+         'uf': a.uf, 'gerente': a.gerente or '—', 'idi': a.idi}
+        for a in agencias if a.status == 'Em Reforma'
+    ]
+
+    # Lista de vistorias vencidas com detalhes (ordenada por mais dias vencida)
+    vencidas_lista = []
+    for a in [ag for ag in agencias if ag.vistoria_bombeiros]:
+        v = a.vistoria_bombeiros
+        if v and v.data_validade and v.data_validade < hoje:
+            vencidas_lista.append({
+                'prefixo': a.prefixo, 'nome': a.nome,
+                'municipio': a.municipio, 'uf': a.uf,
+                'protocolo': v.protocolo,
+                'data_validade': v.data_validade.strftime('%d/%m/%Y'),
+                'dias_vencida': (hoje - v.data_validade).days,
+            })
+    vencidas_lista.sort(key=lambda x: x['dias_vencida'], reverse=True)
+
+    # Top 5 maiores consumidores de energia
+    top_energia_lista = [
+        {'prefixo': a.prefixo, 'nome': a.nome, 'uf': a.uf,
+         'consumo': a.consumo_energia, 'efic': a.eficiencia_energetica}
+        for a in sorted(
+            [ag for ag in agencias if ag.consumo_energia],
+            key=lambda a: a.consumo_energia, reverse=True
+        )[:5]
+    ]
+
+    # Ranking eficiência energética por UF (top 6 piores = maior consumo/m²)
     com_efic_ags = [(a.uf, a.eficiencia_energetica) for a in agencias if a.eficiencia_energetica]
     uf_efic = {}
     for uf, efic in com_efic_ags:
@@ -402,26 +440,54 @@ def get_stats():
     )[:6]
 
     return {
-        'total':          total,
-        'em_reforma':     em_reforma,
-        'fechadas':       fechadas,
-        'operando':       operando,
-        'limiar_idi':     limiar_idi,
-        'idi_critico':    idi_critico,
-        'idi_medio':      idi_medio,
-        'total_energia':  total_energia,
-        'total_agua':     int(total_agua),
-        'media_efic':     media_efic,
-        'total_residuos': int(total_residuos),
-        'total_colab':    total_colab,
-        'pct_acessivel':  pct_acessivel,
-        'acessiveis':     acessiveis,
-        'vencidas':       vencidas,
-        'sem_vistoria':   sem_vistoria,
-        'segmentos':      segmentos,
-        'bacen_dist':     bacen_dist,
-        'top_criticos':   top_criticos,
-        'ranking_efic':   ranking_efic,
+        'total':              total,
+        'em_reforma':         em_reforma,
+        'fechadas':           fechadas,
+        'operando':           operando,
+        'limiar_idi':         limiar_idi,
+        'idi_critico':        idi_critico,
+        'idi_medio':          idi_medio,
+        'total_energia':      total_energia,
+        'total_agua':         int(total_agua),
+        'media_efic':         media_efic,
+        'total_residuos':     int(total_residuos),
+        'total_colab':        total_colab,
+        'pct_acessivel':      pct_acessivel,
+        'acessiveis':         acessiveis,
+        'vencidas':           vencidas,
+        'sem_vistoria':       sem_vistoria,
+        'segmentos':          segmentos,
+        'bacen_dist':         bacen_dist,
+        'top_criticos':       top_criticos,
+        'idi_critico_lista':  idi_critico_lista,
+        'em_reforma_lista':   em_reforma_lista,
+        'vencidas_lista':     vencidas_lista,
+        'top_energia_lista':  top_energia_lista,
+        'ranking_efic':       ranking_efic,
+    }
+
+
+def get_alerts():
+    """Retorna apenas os dados de alerta necessários para a tela inicial."""
+    agencias = Agencia.query.all()
+    hoje = date.today()
+
+    limiar_cfg = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
+    limiar_idi = float(limiar_cfg.valor) if limiar_cfg else 3.0
+
+    com_idi     = [a for a in agencias if a.idi is not None]
+    idi_critico = sum(1 for a in com_idi if a.idi < limiar_idi)
+
+    com_vistoria = [a for a in agencias if a.vistoria_bombeiros]
+    vencidas = sum(
+        1 for a in com_vistoria
+        if a.vistoria_bombeiros.data_validade and a.vistoria_bombeiros.data_validade < hoje
+    )
+
+    return {
+        'idi_critico': idi_critico,
+        'limiar_idi':  limiar_idi,
+        'vencidas':    vencidas,
     }
 
 
@@ -458,8 +524,8 @@ def logout():
 @login_required
 def index():
     ctx = get_template_context()
-    ctx['page_title'] = 'Página Inicial'
-    ctx['stats']      = get_stats()
+    ctx['page_title'] = 'Início'
+    ctx['alerts']     = get_alerts()
     return render_template('index.html', **ctx)
 
 
@@ -472,14 +538,13 @@ def agencias():
     return render_template('agencias.html', **ctx)
 
 
-@app.route('/detalhes')
+@app.route('/informacoes')
 @login_required
 def detalhes_index():
-    """Redireciona para a primeira agência cadastrada."""
-    ag = Agencia.query.order_by(Agencia.nome).first()
-    if ag:
-        return redirect(url_for('detalhes', prefixo=ag.prefixo))
-    abort(404)
+    """Tela de busca/filtro de agências — Informações das Agências."""
+    ctx = get_template_context()
+    ctx['page_title'] = 'Informações das Agências'
+    return render_template('informacoes.html', **ctx)
 
 
 @app.route('/detalhes/<prefixo>')
@@ -487,7 +552,7 @@ def detalhes_index():
 def detalhes(prefixo):
     agencia = Agencia.query.filter_by(prefixo=prefixo).first_or_404()
     ctx = get_template_context()
-    ctx['page_title']      = f"Agência {prefixo}"
+    ctx['page_title']      = f"Informações — Agência {prefixo}"
     ctx['agencia']         = agencia
     ctx['google_maps_key'] = os.environ.get('GOOGLE_MAPS_API_KEY', '')
     return render_template('detalhes.html', **ctx)
@@ -577,7 +642,7 @@ def api_agencias_criar():
         try:
             idi = float(idi)
             if not validar_idi(idi):
-                return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
+                return jsonify({'erro': 'O IDI deve estar entre 1,0 e 5,0.'}), 400
         except (TypeError, ValueError):
             return jsonify({'erro': 'IDI deve ser um número'}), 400
     else:
@@ -648,7 +713,7 @@ def api_agencias_editar(agencia_id):
             try:
                 idi_val = float(data['idi'])
                 if not validar_idi(idi_val):
-                    return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
+                    return jsonify({'erro': 'O IDI deve estar entre 1,0 e 5,0.'}), 400
                 ag.idi = idi_val
             except (TypeError, ValueError):
                 return jsonify({'erro': 'IDI deve ser um número'}), 400
@@ -1025,8 +1090,8 @@ def api_config_limiar_idi_put():
     except (TypeError, ValueError):
         return jsonify({'erro': 'O limiar deve ser um número'}), 400
 
-    if not (1.0 <= limiar <= 9.9):
-        return jsonify({'erro': 'O limiar deve estar entre 1,0 e 9,9.'}), 400
+    if not (1.0 <= limiar <= 5.0):
+        return jsonify({'erro': 'O limiar deve estar entre 1,0 e 5,0.'}), 400
 
     config = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
     if config:

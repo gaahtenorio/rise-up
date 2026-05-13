@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Agência {{ agencia.prefixo }} | Portal DISEC{% endblock %}
+{% block title %}Informações — Agência {{ agencia.prefixo }} | Portal DISEC{% endblock %}
 
 {% block content %}
 <div class="detalhes-wrapper">
@@ -42,7 +42,7 @@
                 <i class="fas fa-edit"></i> Editar Dados
             </button>
             {% endif %}
-            <a href="{{ url_for('agencias') }}" class="btn btn-primary">
+            <a href="{{ url_for('detalhes_index') }}" class="btn btn-primary">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
         </div>
@@ -607,8 +607,8 @@
             </div>
             <div class="form-grid cols-2" style="margin-bottom:16px;">
                 <div class="form-group">
-                    <label class="form-label">IDI (1,0 – 10,0)</label>
-                    <input type="number" step="0.1" min="1" max="10" class="form-input" id="edit-idi"
+                    <label class="form-label">IDI (1,0 – 5,0)</label>
+                    <input type="number" step="0.1" min="1" max="5" class="form-input" id="edit-idi"
                            value="{{ agencia.idi or '' }}">
                 </div>
                 <div class="form-group">
