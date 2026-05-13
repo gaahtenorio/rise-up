@@ -21,9 +21,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
-# Garante que os diretórios de upload existam na inicialização
 os.makedirs(os.path.join(BASE_DIR, 'uploads', 'dwg'), exist_ok=True)
 os.makedirs(os.path.join(BASE_DIR, 'uploads', 'bombeiros'), exist_ok=True)
 
@@ -87,12 +86,12 @@ class Agencia(db.Model):
     status     = db.Column(db.String(50),  nullable=True, default='Operação Normal')
     lat        = db.Column(db.Float, nullable=True)
     lng        = db.Column(db.Float, nullable=True)
-    # ESG
+
     consumo_energia = db.Column(db.Float, nullable=True)
     consumo_agua    = db.Column(db.Float, nullable=True)
     carbono         = db.Column(db.Float, nullable=True)
     acessibilidade  = db.Column(db.Boolean, default=True)
-    # Novos campos
+
     eficiencia_energetica          = db.Column(db.Float, nullable=True)
     area_util                      = db.Column(db.Float, nullable=True)
     idi                            = db.Column(db.Float, nullable=True)
@@ -104,7 +103,7 @@ class Agencia(db.Model):
     classificacao_bacen            = db.Column(db.String(60), nullable=True)
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    # Relacionamentos
+
     arquivos_dwg       = db.relationship('ArquivoDWG', back_populates='agencia', cascade='all, delete-orphan')
     horarios_saa       = db.relationship('HorarioSAA', back_populates='agencia', cascade='all, delete-orphan')
     vistoria_bombeiros = db.relationship('VistoriaBombeiros', back_populates='agencia', uselist=False, cascade='all, delete-orphan')
@@ -157,7 +156,7 @@ class ArquivoDWG(db.Model):
     id            = db.Column(db.Integer, primary_key=True)
     agencia_id    = db.Column(db.Integer, db.ForeignKey('agencias.id', ondelete='CASCADE'), nullable=False)
     nome_original = db.Column(db.String(255), nullable=False)
-    nome_arquivo  = db.Column(db.String(255), nullable=False)  # UUID + extensão no disco
+    nome_arquivo  = db.Column(db.String(255), nullable=False)
     tamanho_bytes = db.Column(db.Integer, nullable=False)
     enviado_em    = db.Column(db.DateTime, default=datetime.utcnow)
     agencia       = db.relationship('Agencia', back_populates='arquivos_dwg')
@@ -167,8 +166,8 @@ class HorarioSAA(db.Model):
     __tablename__ = 'horarios_saa'
     id            = db.Column(db.Integer, primary_key=True)
     agencia_id    = db.Column(db.Integer, db.ForeignKey('agencias.id', ondelete='CASCADE'), nullable=False)
-    dia_semana    = db.Column(db.String(20), nullable=False)   # 'Segunda', 'Terça', ..., 'Domingo'
-    hora_abertura = db.Column(db.String(5),  nullable=False)   # 'HH:MM'
+    dia_semana    = db.Column(db.String(20), nullable=False)
+    hora_abertura = db.Column(db.String(5),  nullable=False)
     hora_encerramento = db.Column(db.String(5), nullable=False)
     agencia       = db.relationship('Agencia', back_populates='horarios_saa')
 
@@ -180,8 +179,8 @@ class VistoriaBombeiros(db.Model):
     protocolo       = db.Column(db.String(100), nullable=False)
     data_emissao    = db.Column(db.Date, nullable=False)
     data_validade   = db.Column(db.Date, nullable=True)
-    nome_arquivo    = db.Column(db.String(255), nullable=True)   # UUID no disco
-    nome_original   = db.Column(db.String(255), nullable=True)   # nome original do PDF
+    nome_arquivo    = db.Column(db.String(255), nullable=True)
+    nome_original   = db.Column(db.String(255), nullable=True)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     agencia         = db.relationship('Agencia', back_populates='vistoria_bombeiros')
 
@@ -192,10 +191,6 @@ class ConfiguracaoSistema(db.Model):
     chave = db.Column(db.String(100), unique=True, nullable=False)
     valor = db.Column(db.String(255), nullable=False)
 
-
-# ---------------------------------------------------------------------------
-# Funções auxiliares de validação e cálculo
-# ---------------------------------------------------------------------------
 
 def calcular_eficiencia_energetica(consumo_energia, area_util):
     """Calcula eficiência energética em kWh/m².
@@ -336,19 +331,16 @@ def get_stats():
     total    = len(agencias)
     hoje     = date.today()
 
-    # Status
     em_reforma = sum(1 for a in agencias if a.status == 'Em Reforma')
     fechadas   = sum(1 for a in agencias if a.status == 'Fechada')
     operando   = sum(1 for a in agencias if a.status not in ('Em Reforma', 'Fechada'))
 
-    # IDI
     limiar_cfg = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
     limiar_idi = float(limiar_cfg.valor) if limiar_cfg else 3.0
     com_idi    = [a for a in agencias if a.idi is not None]
     idi_critico = sum(1 for a in com_idi if a.idi < limiar_idi)
     idi_medio  = round(sum(a.idi for a in com_idi) / len(com_idi), 1) if com_idi else None
 
-    # ESG — Ambiental
     com_energia = [a.consumo_energia for a in agencias if a.consumo_energia]
     com_agua    = [a.consumo_agua    for a in agencias if a.consumo_agua]
     com_efic    = [a.eficiencia_energetica for a in agencias if a.eficiencia_energetica]
@@ -358,12 +350,10 @@ def get_stats():
     media_efic    = round(sum(com_efic) / len(com_efic), 2) if com_efic else None
     total_residuos = round(sum(com_res), 0) if com_res else 0                  # kg
 
-    # ESG — Social
     total_colab   = sum(a.num_colaboradores for a in agencias if a.num_colaboradores)
     acessiveis    = sum(1 for a in agencias if a.acessibilidade)
     pct_acessivel = round(acessiveis / total * 100) if total else 0
 
-    # Vistorias
     com_vistoria  = [a for a in agencias if a.vistoria_bombeiros]
     vencidas      = sum(
         1 for a in com_vistoria
@@ -371,63 +361,22 @@ def get_stats():
     )
     sem_vistoria  = total - len(com_vistoria)
 
-    # Distribuição por segmento (normaliza acento)
     segmentos = {}
     for a in agencias:
         seg = a.segmento or 'Varejo'
-        seg = seg.replace('Agronegocio', 'Agronegócio')  # normaliza legado sem acento
+        seg = seg.replace('Agronegocio', 'Agronegócio')
         segmentos[seg] = segmentos.get(seg, 0) + 1
 
-    # Distribuição por classificação BACEN
     bacen_dist = {}
     for a in agencias:
         cls = a.classificacao_bacen or 'Não classificada'
         bacen_dist[cls] = bacen_dist.get(cls, 0) + 1
 
-    # Top 5 IDI mais críticos (com IDI preenchido, ordenado crescente)
     criticos = sorted(com_idi, key=lambda a: a.idi)[:5]
     top_criticos = [{'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
                      'municipio': a.municipio, 'uf': a.uf} for a in criticos]
 
-    # Lista completa de IDI críticos (abaixo do limiar)
-    idi_critico_lista = [
-        {'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
-         'municipio': a.municipio, 'uf': a.uf, 'status': a.status}
-        for a in sorted(com_idi, key=lambda a: a.idi) if a.idi < limiar_idi
-    ]
-
-    # Lista de agências em reforma
-    em_reforma_lista = [
-        {'prefixo': a.prefixo, 'nome': a.nome, 'municipio': a.municipio,
-         'uf': a.uf, 'gerente': a.gerente or '—', 'idi': a.idi}
-        for a in agencias if a.status == 'Em Reforma'
-    ]
-
-    # Lista de vistorias vencidas com detalhes (ordenada por mais dias vencida)
-    vencidas_lista = []
-    for a in [ag for ag in agencias if ag.vistoria_bombeiros]:
-        v = a.vistoria_bombeiros
-        if v and v.data_validade and v.data_validade < hoje:
-            vencidas_lista.append({
-                'prefixo': a.prefixo, 'nome': a.nome,
-                'municipio': a.municipio, 'uf': a.uf,
-                'protocolo': v.protocolo,
-                'data_validade': v.data_validade.strftime('%d/%m/%Y'),
-                'dias_vencida': (hoje - v.data_validade).days,
-            })
-    vencidas_lista.sort(key=lambda x: x['dias_vencida'], reverse=True)
-
-    # Top 5 maiores consumidores de energia
-    top_energia_lista = [
-        {'prefixo': a.prefixo, 'nome': a.nome, 'uf': a.uf,
-         'consumo': a.consumo_energia, 'efic': a.eficiencia_energetica}
-        for a in sorted(
-            [ag for ag in agencias if ag.consumo_energia],
-            key=lambda a: a.consumo_energia, reverse=True
-        )[:5]
-    ]
-
-    # Ranking eficiência energética por UF (top 6 piores = maior consumo/m²)
+    # Ranking eficiência energética por UF (top 5 piores = maior consumo/m²)
     com_efic_ags = [(a.uf, a.eficiencia_energetica) for a in agencias if a.eficiencia_energetica]
     uf_efic = {}
     for uf, efic in com_efic_ags:
@@ -631,7 +580,6 @@ def api_agencias_criar():
     if Agencia.query.filter_by(prefixo=prefixo).first():
         return jsonify({'erro': f'Prefixo {prefixo} já cadastrado'}), 409
 
-    # Validate CNPJ format if provided
     cnpj = data.get('cnpj')
     if cnpj and not validar_cnpj_formato(cnpj):
         return jsonify({'erro': 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX.'}), 400
@@ -767,22 +715,18 @@ def api_dwg_upload(agencia_id):
     if not arquivo.filename:
         return jsonify({'erro': 'Nenhum arquivo selecionado'}), 400
 
-    # Validate extension against the original filename (before sanitization)
     if not arquivo.filename.lower().endswith('.dwg'):
         return jsonify({'erro': 'Apenas arquivos no formato DWG são aceitos.'}), 400
 
-    # Sanitize filename for storage; if secure_filename strips everything, fall back to uuid.dwg
     nome_seguro = secure_filename(arquivo.filename)
     if not nome_seguro or nome_seguro.lower() == 'dwg':
         nome_seguro = f"{uuid.uuid4().hex}.dwg"
 
-    # Validate size (read content to check; MAX_CONTENT_LENGTH handles global limit)
     conteudo = arquivo.read()
     tamanho = len(conteudo)
     if tamanho > 50 * 1024 * 1024:
         return jsonify({'erro': 'O arquivo excede o limite de 50 MB.'}), 400
 
-    # Save file with UUID prefix
     nome_uuid = f"{uuid.uuid4().hex}_{nome_seguro}"
     pasta = os.path.join(app.config['UPLOAD_FOLDER'], 'dwg', str(agencia_id))
     os.makedirs(pasta, exist_ok=True)
@@ -827,7 +771,7 @@ def api_dwg_download(agencia_id, dwg_id):
 def api_dwg_deletar(agencia_id, dwg_id):
     ag = Agencia.query.get_or_404(agencia_id)
     arquivo = ArquivoDWG.query.filter_by(id=dwg_id, agencia_id=agencia_id).first_or_404()
-    # Remove physical file
+
     caminho = os.path.join(app.config['UPLOAD_FOLDER'], 'dwg', str(agencia_id), arquivo.nome_arquivo)
     if os.path.exists(caminho):
         os.remove(caminho)
@@ -840,7 +784,7 @@ def api_dwg_deletar(agencia_id, dwg_id):
 @login_required
 def api_horarios_listar(agencia_id):
     ag = Agencia.query.get_or_404(agencia_id)
-    # Order by DIAS_SEMANA index
+
     horarios = HorarioSAA.query.filter_by(agencia_id=agencia_id).all()
     def ordem_dia(h):
         try:
@@ -874,7 +818,6 @@ def api_horarios_criar(agencia_id):
     if dia_semana not in DIAS_SEMANA:
         return jsonify({'erro': f'Dia da semana inválido. Use: {", ".join(DIAS_SEMANA)}'}), 400
 
-    # Validate temporal order
     if hora_encerramento <= hora_abertura:
         return jsonify({'erro': 'O horário de encerramento deve ser posterior ao horário de abertura.'}), 400
 
@@ -980,7 +923,6 @@ def api_vistoria_upsert(agencia_id):
         except ValueError:
             return jsonify({'erro': 'Formato de data de validade inválido. Use YYYY-MM-DD'}), 400
 
-    # Upsert: update existing or create new
     v = ag.vistoria_bombeiros
     if v:
         v.protocolo = protocolo
@@ -1032,7 +974,6 @@ def api_vistoria_upload(agencia_id):
     if tamanho > 20 * 1024 * 1024:
         return jsonify({'erro': 'O arquivo excede o limite de 20 MB.'}), 400
 
-    # Remove old file if exists
     if v.nome_arquivo:
         caminho_antigo = os.path.join(app.config['UPLOAD_FOLDER'], 'bombeiros', str(agencia_id), v.nome_arquivo)
         if os.path.exists(caminho_antigo):
