@@ -21,7 +21,7 @@
 
 ## Sobre o Projeto
 
-O **DISEC** é uma aplicação web desenvolvida para centralizar o gerenciamento de informações de agências bancárias. O sistema permite acompanhar dados operacionais, indicadores de sustentabilidade, conformidade com vistorias do Corpo de Bombeiros, arquivos técnicos (DWG), horários de atendimento (SAA) e muito mais — tudo em um painel estratégico com visualização por mapa.
+O **DISEC** é uma aplicação web desenvolvida para centralizar o gerenciamento de informações de agências bancárias. O sistema permite acompanhar dados operacionais, indicadores de sustentabilidade, conformidade com vistorias do Corpo de Bombeiros, arquivos técnicos (DWG), horários de atendimento (SAA) e muito mais, tudo em um painel estratégico com visualização por mapa.
 
 ---
 
@@ -131,7 +131,6 @@ Acesse em: [http://localhost:5000](http://localhost:5000)
 
 | Usuário | Senha | Nível |
 |---|---|---|
-| `igor.barbosa` | `123` | Gestão |
 | `visitante` | `abc` | Consulta |
 
 > ⚠️ Altere as credenciais padrão antes de qualquer uso em ambiente externo.
