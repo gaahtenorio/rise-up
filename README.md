@@ -1,359 +1,230 @@
-# Sistema DISEC — Gestão Nacional de Agências
+# DISEC — Sistema de Gestão de Infraestrutura de Agências
+
+> Desenvolvido durante a residência tecnológica do Porto Digital, este sistema web visa otimizar a gestão e o monitoramento de agências bancárias através de análises estratégicas avançadas.
+
+---
+
+## Índice
+
+- [Sobre o Projeto](#sobre-o-projeto)
+- [Demo](#demo)
+- [Funcionalidades](#funcionalidades)
+- [Tecnologias](#tecnologias)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Como Executar](#como-executar)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Níveis de Acesso](#níveis-de-acesso)
+- [API REST](#api-rest)
+- [Licença](#licença)
+
+---
 
 ## Sobre o Projeto
 
-O **Sistema DISEC** é uma aplicação web desenvolvida em **Python + Flask** para gerenciamento nacional de agências bancárias, permitindo controle operacional, ambiental e documental das unidades.
-
-O sistema oferece:
-
-- Cadastro e gestão de agências
-- Dashboard estratégico com indicadores
-- Controle de usuários e permissões
-- Upload de arquivos DWG
-- Gestão de vistorias do Corpo de Bombeiros
-- Controle de horários de atendimento
-- Indicadores ESG e eficiência energética
-- APIs REST para integração
+O **DISEC** é uma aplicação web desenvolvida para centralizar o gerenciamento de informações de agências bancárias. O sistema permite acompanhar dados operacionais, indicadores de sustentabilidade, conformidade com vistorias do Corpo de Bombeiros, arquivos técnicos (DWG), horários de atendimento (SAA) e muito mais — tudo em um painel estratégico com visualização por mapa.
 
 ---
 
-# Tecnologias Utilizadas
+## Demo
 
-- Python 3
-- Flask
-- Flask SQLAlchemy
-- SQLite
-- Jinja2
-- HTML5
-- CSS3
-- JavaScript
-- Google Maps API
+A aplicação está disponível online via PythonAnywhere:
+
+🔗 **[https://riseup.pythonanywhere.com](https://riseup.pythonanywhere.com)**
+
+Use as credenciais abaixo para explorar o sistema:
+
+| Usuário | Senha | Nível |
+|---|---|---|
+| `visitante` | `abc` | Consulta |
 
 ---
 
-# Estrutura do Projeto
+## Funcionalidades
 
-```bash
-.
-├── app.py
+- **Dashboard estratégico** com indicadores agregados de toda a rede de agências
+- **Consulta nacional** de agências com filtros por nome, município, UF e classificação BACEN
+- **Detalhamento por agência**: dados cadastrais, endereço, geolocalização e métricas
+- **Indicador IDI** (Índice de Desempenho de Infraestrutura) com limiar configurável
+- **Métricas de sustentabilidade**: consumo de energia, água, resíduos sólidos, eficiência energética e carbono
+- **Gestão de vistorias do Corpo de Bombeiros**: protocolo, validade e upload de PDF
+- **Upload e download de arquivos DWG** (plantas técnicas) por agência
+- **Horários SAA** (Serviço de Atendimento ao Cliente) por dia da semana
+- **Gestão de usuários** com controle de níveis de acesso
+- **Mapa interativo** com marcadores coloridos por IDI (via Google Maps)
+- **Classificação BACEN** das agências (Agência, PAB, PAE, UAB, Correspondente Bancário)
+
+---
+
+## Tecnologias
+
+| Camada | Tecnologia |
+|---|---|
+| Backend | Python 3 + Flask 3.0 |
+| ORM | Flask-SQLAlchemy 3.1 |
+| Banco de dados | SQLite (desenvolvimento) / PostgreSQL (produção) |
+| Autenticação | Werkzeug (hash de senhas) + Flask Session |
+| Templates | Jinja2 3.1 |
+| Frontend | HTML/CSS/JS + Google Maps API |
+| Upload de arquivos | Werkzeug (DWG até 50 MB, PDF até 20 MB) |
+
+---
+
+## Estrutura do Projeto
+
+```
+disec/
+├── app.py                  # Aplicação principal (models, rotas, API)
 ├── data/
-│   └── agencias.json
+│   └── agencias.json       # Dados iniciais das agências (seed)
 ├── uploads/
-│   ├── dwg/
-│   └── bombeiros/
+│   ├── dwg/                # Arquivos DWG por agência
+│   └── bombeiros/          # PDFs de vistoria por agência
 ├── templates/
-├── static/
-├── disec.db
-└── requirements.txt
+│   ├── login.html
+│   ├── index.html
+│   ├── agencias.html
+│   ├── detalhes.html
+│   ├── dashboard.html
+│   ├── admin.html
+│   └── errors/
+│       ├── 403.html
+│       ├── 404.html
+│       └── 500.html
+├── static/                 # CSS, JS, imagens
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-# Funcionalidades
+## Como Executar
 
-## Autenticação e Controle de Acesso
+### Pré-requisitos
 
-O sistema possui autenticação baseada em sessão:
+- Python 3.10 ou superior
+- pip
 
-- Login/logout
-- Controle de permissões:
-  - Gestão
-  - Consulta
-
-Rotas protegidas com:
-
-```python
-@login_required
-@gestao_required
-```
-
----
-
-## Gestão de Agências
-
-Cada agência possui:
-
-- Prefixo
-- Nome
-- Município
-- UF
-- Endereço completo
-- Segmento
-- Status operacional
-- Coordenadas geográficas
-- Indicadores ambientais
-- Dados BACEN
-
----
-
-## Indicadores ESG
-
-O sistema monitora:
-
-- Consumo de energia
-- Consumo de água
-- Resíduos sólidos
-- Acessibilidade
-- Emissão de carbono
-- Eficiência energética
-- Índice IDI
-
-### Fórmula de eficiência energética
-
-```text
-Eficiência = Consumo de Energia / Área Útil
-```
-
----
-
-## Dashboard Estratégico
-
-O dashboard apresenta:
-
-- Total de agências
-- Agências operando
-- Agências fechadas
-- Agências em reforma
-- Média de IDI
-- Ranking de eficiência energética
-- Distribuição BACEN
-- Percentual de acessibilidade
-- Indicadores ambientais
-
----
-
-## Upload de Arquivos DWG
-
-O sistema permite:
-
-- Upload de arquivos `.dwg`
-- Download de arquivos
-- Exclusão de documentos
-- Controle por agência
-
-### Limitações
-
-- Apenas arquivos `.dwg`
-- Limite de 50 MB
-
----
-
-## Gestão de Vistorias dos Bombeiros
-
-Recursos disponíveis:
-
-- Cadastro de protocolo
-- Controle de validade
-- Upload de PDF
-- Download de documentos
-- Verificação automática de vencimento
-
-### Limitações
-
-- Apenas PDF
-- Limite de 20 MB
-
----
-
-## Gestão de Usuários
-
-Administradores podem:
-
-- Criar usuários
-- Editar usuários
-- Alterar permissões
-- Ativar/desativar contas
-- Excluir usuários
-
----
-
-# Modelos do Banco de Dados
-
-## Usuario
-
-Responsável pela autenticação e controle de acesso.
-
-## Agencia
-
-Entidade principal do sistema.
-
-## ArquivoDWG
-
-Armazena arquivos técnicos das agências.
-
-## HorarioSAA
-
-Controla horários de atendimento.
-
-## VistoriaBombeiros
-
-Gerencia documentos e vencimentos das vistorias.
-
-## ConfiguracaoSistema
-
-Armazena parâmetros globais do sistema.
-
----
-
-# API REST
-
-## Agências
-
-| Método | Endpoint |
-|---|---|
-| GET | `/api/agencias` |
-| POST | `/api/agencias` |
-| PUT | `/api/agencias/<id>` |
-| DELETE | `/api/agencias/<id>` |
-
----
-
-## Usuários
-
-| Método | Endpoint |
-|---|---|
-| GET | `/api/usuarios` |
-| POST | `/api/usuarios` |
-| PUT | `/api/usuarios/<id>` |
-| DELETE | `/api/usuarios/<id>` |
-
----
-
-## DWG
-
-| Método | Endpoint |
-|---|---|
-| GET | `/api/agencias/<id>/dwg` |
-| POST | `/api/agencias/<id>/dwg` |
-| DELETE | `/api/agencias/<id>/dwg/<id>` |
-
----
-
-## Bombeiros
-
-| Método | Endpoint |
-|---|---|
-| GET | `/api/agencias/<id>/vistoria` |
-| POST | `/api/agencias/<id>/vistoria` |
-| POST | `/api/agencias/<id>/vistoria/upload` |
-
----
-
-# Instalação
-
-## 1️ - Clone o projeto
+### Instalação
 
 ```bash
+# 1. Clone o repositório
 git clone https://github.com/seu-usuario/disec.git
 cd disec
-```
 
----
-
-## 2️ - Crie o ambiente virtual
-
-### Windows
-
-```bash
+# 2. Crie e ative um ambiente virtual
 python -m venv venv
-venv\Scripts\activate
-```
+source venv/bin/activate        # Linux/macOS
+venv\Scripts\activate           # Windows
 
-### Linux/macOS
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
----
-
-## 3️ - Instale as dependências
-
-```bash
+# 3. Instale as dependências
 pip install -r requirements.txt
-```
 
----
-
-## 4️ - Configure as variáveis de ambiente
-
-```env
-SECRET_KEY=sua_chave_secreta
-FLASK_DEBUG=True
-GOOGLE_MAPS_API_KEY=sua_api_key
-DATABASE_URL=sqlite:///disec.db
-```
-
----
-
-## 5️ - Execute o sistema
-
-```bash
+# 4. Execute a aplicação
 python app.py
 ```
----
 
-## 🔐 Credenciais iniciais
+Acesse em: [http://localhost:5000](http://localhost:5000)
+
+> O banco de dados SQLite (`disec.db`) e os usuários iniciais são criados automaticamente na primeira execução.
+
+### Credenciais padrão
+
 | Usuário | Senha | Nível |
-|--------|------|------|
-| visitante | abc | Consulta |
+|---|---|---|
+| `igor.barbosa` | `123` | Gestão |
+| `visitante` | `abc` | Consulta |
+
+> ⚠️ Altere as credenciais padrão antes de qualquer uso em ambiente externo.
 
 ---
 
-# Regras de Negócio
+## Variáveis de Ambiente
 
-## IDI
+| Variável | Descrição | Padrão |
+|---|---|---|
+| `SECRET_KEY` | Chave secreta da sessão Flask | `fallback_inseguro_troque_em_producao` |
+| `DATABASE_URL` | URL de conexão com o banco | `sqlite:///disec.db` |
+| `GOOGLE_MAPS_API_KEY` | Chave da API do Google Maps | _(vazio — mapa desabilitado)_ |
+| `FLASK_DEBUG` | Ativa o modo debug | `False` |
 
-O IDI deve estar entre:
+Exemplo com PostgreSQL:
 
-```text
-1.0 <= IDI <= 10.0
+```bash
+export DATABASE_URL="postgresql://usuario:senha@localhost/disec"
+export SECRET_KEY="sua-chave-secreta-segura"
+export GOOGLE_MAPS_API_KEY="sua-chave-google-maps"
+python app.py
 ```
 
 ---
 
-## CNPJ
+## Níveis de Acesso
 
-Formato obrigatório:
-
-```text
-XX.XXX.XXX/XXXX-XX
-```
-
----
-
-# Segurança
-
-- Senhas armazenadas com hash (`werkzeug.security`)
-- Controle de sessão
-- Upload com validação
-- Proteção por níveis de acesso
-- Sanitização de nomes de arquivos
+| Nível | Permissões |
+|---|---|
+| **Consulta** | Visualizar agências, dashboard, detalhes e download de arquivos |
+| **Gestão** | Tudo acima + criar/editar/excluir agências, usuários, vistorias, DWGs e configurações |
 
 ---
 
-# Melhorias Futuras
+## API REST
 
-- Integração com PostgreSQL
-- Docker
-- JWT Authentication
-- Logs de auditoria
-- Integração com Power BI
-- Relatórios em PDF
-- Notificações automáticas
-- API documentada com Swagger
+Todas as rotas exigem autenticação via sessão. Rotas de escrita exigem nível **Gestão**.
+
+### Agências
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/agencias` | Lista agências (filtros: `q`, `uf`, `classificacao_bacen`) |
+| `GET` | `/api/agencias/<id>` | Retorna uma agência |
+| `POST` | `/api/agencias` | Cria uma agência |
+| `PUT` | `/api/agencias/<id>` | Atualiza uma agência |
+| `DELETE` | `/api/agencias/<id>` | Remove uma agência |
+
+### Arquivos DWG
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/agencias/<id>/dwg` | Lista arquivos DWG |
+| `POST` | `/api/agencias/<id>/dwg` | Faz upload de DWG |
+| `GET` | `/api/agencias/<id>/dwg/<dwg_id>/download` | Download de DWG |
+| `DELETE` | `/api/agencias/<id>/dwg/<dwg_id>` | Remove um DWG |
+
+### Vistoria do Corpo de Bombeiros
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/agencias/<id>/vistoria` | Consulta vistoria |
+| `POST` | `/api/agencias/<id>/vistoria` | Cria ou atualiza vistoria |
+| `POST` | `/api/agencias/<id>/vistoria/upload` | Upload do PDF da vistoria |
+| `GET` | `/api/agencias/<id>/vistoria/download` | Download do PDF |
+
+### Horários SAA
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/agencias/<id>/horarios` | Lista horários |
+| `POST` | `/api/agencias/<id>/horarios` | Adiciona horário |
+| `PUT` | `/api/agencias/<id>/horarios/<h_id>` | Atualiza horário |
+| `DELETE` | `/api/agencias/<id>/horarios/<h_id>` | Remove horário |
+
+### Usuários e Configurações
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/usuarios` | Lista usuários |
+| `POST` | `/api/usuarios` | Cria usuário |
+| `PUT` | `/api/usuarios/<id>` | Atualiza usuário |
+| `DELETE` | `/api/usuarios/<id>` | Remove usuário |
+| `GET` | `/api/config/limiar-idi` | Consulta limiar do IDI |
+| `PUT` | `/api/config/limiar-idi` | Atualiza limiar do IDI |
 
 ---
 
-# Autor
+## Licença
 
-**Igor Barbosa**
-
-Sistema desenvolvido para gestão estratégica e operacional de agências bancárias.
+Este projeto está licenciado sob a [MIT License](LICENSE).
 
 ---
 
-# Licença
-
-Este projeto é destinado para uso interno e educacional.
+> Desenvolvido como projeto acadêmico.
