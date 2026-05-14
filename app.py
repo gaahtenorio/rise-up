@@ -388,6 +388,46 @@ def get_stats():
         key=lambda x: x['media'], reverse=True
     )[:6]
 
+    # Listas detalhadas para as tabelas do dashboard
+    idi_critico_lista = sorted(
+        [a for a in com_idi if a.idi < limiar_idi],
+        key=lambda a: a.idi
+    )
+
+    em_reforma_lista = [a for a in agencias if a.status == 'Em Reforma']
+
+    vencidas_lista = []
+    for a in com_vistoria:
+        v = a.vistoria_bombeiros
+        if v.data_validade and v.data_validade < hoje:
+            dias_vencida = (hoje - v.data_validade).days
+            vencidas_lista.append({
+                'prefixo':       a.prefixo,
+                'nome':          a.nome,
+                'municipio':     a.municipio,
+                'uf':            a.uf,
+                'protocolo':     v.protocolo,
+                'data_validade': v.data_validade.strftime('%d/%m/%Y'),
+                'dias_vencida':  dias_vencida,
+            })
+    vencidas_lista.sort(key=lambda x: x['dias_vencida'], reverse=True)
+
+    top_energia_lista = sorted(
+        [a for a in agencias if a.consumo_energia],
+        key=lambda a: a.consumo_energia,
+        reverse=True
+    )[:5]
+    top_energia_lista = [
+        {
+            'prefixo': a.prefixo,
+            'nome':    a.nome,
+            'uf':      a.uf,
+            'consumo': a.consumo_energia,
+            'efic':    a.eficiencia_energetica,
+        }
+        for a in top_energia_lista
+    ]
+
     return {
         'total':              total,
         'em_reforma':         em_reforma,

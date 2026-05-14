@@ -30,5 +30,7 @@ Thumbs.db
 
 # Flask
 instance/
-# *.db — banco de produção versionado intencionalmente (disec.db)
+
+# Banco de dados — não versionar (cada ambiente tem o seu)
+*.db
 
