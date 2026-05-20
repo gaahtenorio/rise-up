@@ -17,8 +17,8 @@
     <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('solicitacoes', this)" id="btn-tab-solicitacoes">
         <i class="fas fa-user-clock"></i> Solicitações
         <span id="badge-pendentes" style="display:none;background:#E11D48;color:#fff;
-              border-radius:50%;width:18px;height:18px;font-size:.7rem;font-weight:700;
-              display:inline-flex;align-items:center;justify-content:center;margin-left:6px;">0</span>
+              border-radius:50%;min-width:18px;height:18px;font-size:.7rem;font-weight:700;
+              align-items:center;justify-content:center;margin-left:6px;padding:0 4px;">0</span>
     </button>
 </div>
 
@@ -686,6 +686,11 @@ function renderSolicitacoes(lista) {
             <button class="btn btn-ghost" style="padding:5px 12px;font-size:.8rem;color:#E11D48;border-color:#E11D48;"
                     onclick="rejeitarSolicitacao(${s.id}, '${s.nome.replace(/'/g,"\\'")}')">
                 <i class="fas fa-times"></i> Rejeitar
+            </button>`
+            : s.status === 'aprovado' ? `
+            <button class="btn btn-ghost" style="padding:5px 12px;font-size:.8rem;"
+                    onclick="reenviarSolicitacao(${s.id}, '${s.nome.replace(/'/g,"\\'")}')">
+                <i class="fas fa-paper-plane"></i> Reenviar link
             </button>` : '—';
         return `
         <tr id="row-sol-${s.id}">
@@ -720,6 +725,18 @@ async function rejeitarSolicitacao(id, nome) {
         if (!res.ok) { alert(data.erro || 'Erro ao rejeitar.'); return; }
         carregarSolicitacoes();
         atualizarBadgePendentes();
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+async function reenviarSolicitacao(id, nome) {
+    if (!confirm(`Reenviar link de criação de senha para "${nome}"? Um novo link válido por 24h será enviado.`)) return;
+    try {
+        const res  = await fetch(`/api/solicitacoes/${id}/reenviar`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao reenviar.'); return; }
+        alert('Link reenviado com sucesso!');
     } catch(err) {
         alert('Erro de conexão.');
     }

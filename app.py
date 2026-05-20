@@ -13,6 +13,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
 
+# Carrega variáveis do .env em desenvolvimento local (no PythonAnywhere as vars
+# são configuradas pelo painel e este bloco é ignorado silenciosamente)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback_inseguro_troque_em_producao')
@@ -1431,6 +1439,27 @@ def api_solicitacao_rejeitar(sol_id):
     email_rejeicao(sol)
 
     return jsonify({'ok': True})
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/reenviar', methods=['POST'])
+@gestao_required
+def api_solicitacao_reenviar(sol_id):
+    """Gera novo token e reenvia o e-mail de aprovação (útil quando o link expirou)."""
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status not in ('aprovado',):
+        return jsonify({'erro': 'Só é possível reenviar para solicitações aprovadas.'}), 400
+
+    # Gera novo token
+    token = uuid.uuid4().hex + uuid.uuid4().hex
+    sol.token        = token
+    sol.token_expira = datetime.utcnow() + timedelta(hours=24)
+    db.session.commit()
+
+    link = f"{_base_url()}/definir-senha/{token}"
+    email_aprovacao(sol, link)
+
+    return jsonify({'ok': True, 'link': link})
 
 
 @app.errorhandler(403)
