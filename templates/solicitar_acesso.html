@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitar Acesso | Portal DISEC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <style>
+        .login-card { max-width: 440px; }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--bb-blue);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            margin-bottom: 20px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .back-link:hover { opacity: 1; text-decoration: underline; }
+        .success-box {
+            background: rgba(0,56,168,0.08);
+            border: 2px solid var(--bb-blue);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            color: var(--bb-blue);
+        }
+        .success-box i { font-size: 2.5rem; margin-bottom: 12px; display: block; }
+        .success-box h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+        .success-box p { font-size: 0.88rem; opacity: 0.85; line-height: 1.5; }
+        textarea.input-field-area {
+            width: 100%;
+            padding: 12px 14px;
+            background: rgba(0,56,168,0.08);
+            border: 2px solid rgba(0,56,168,0.2);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: var(--bb-blue);
+            font-family: 'Montserrat', sans-serif;
+            outline: none;
+            resize: vertical;
+            min-height: 80px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        textarea.input-field-area::placeholder { color: rgba(0,56,168,0.4); }
+        textarea.input-field-area:focus {
+            background: rgba(0,56,168,0.13);
+            border-color: var(--bb-blue);
+            box-shadow: 0 0 0 4px rgba(0,56,168,0.15);
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-wrapper" style="max-width:440px;">
+        <div class="login-card" style="text-align:left;">
+            <img src="{{ url_for('static', filename='assets/img/bb-logo.png') }}"
+                 alt="Banco do Brasil" class="login-logo" style="display:block;margin:0 auto 16px;">
+            <h1 class="portal-title" style="text-align:center;">Portal DISEC</h1>
+            <p class="login-subtitle" style="text-align:center;margin-bottom:24px;">Solicitar Acesso ao Sistema</p>
+
+            {% if sucesso %}
+            <div class="success-box">
+                <i class="fas fa-check-circle"></i>
+                <h3>Solicitação enviada!</h3>
+                <p>Sua solicitação foi recebida e será analisada pela equipe DISEC.<br>
+                   Você receberá um e-mail quando for aprovada.</p>
+            </div>
+            <a href="{{ url_for('login') }}" class="back-link" style="margin-top:20px;display:inline-flex;">
+                <i class="fas fa-arrow-left"></i> Voltar ao login
+            </a>
+            {% else %}
+            <a href="{{ url_for('login') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Voltar ao login
+            </a>
+
+            {% if erro %}
+            <p class="error-msg" style="display:block;margin-bottom:16px;">{{ erro }}</p>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('solicitar_acesso') }}" novalidate>
+                <div class="input-group">
+                    <label for="nome">Nome Completo</label>
+                    <div class="input-field">
+                        <i class="fa-regular fa-user"></i>
+                        <input type="text" id="nome" name="nome" placeholder="Seu nome completo"
+                               required autocomplete="name">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="email">E-mail Corporativo</label>
+                    <div class="input-field">
+                        <i class="fa-regular fa-envelope"></i>
+                        <input type="email" id="email" name="email" placeholder="seu.email@bb.com.br"
+                               required autocomplete="email">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="justificativa">Justificativa <span style="font-weight:400;opacity:.6;">(opcional)</span></label>
+                    <textarea class="input-field-area" id="justificativa" name="justificativa"
+                              placeholder="Descreva brevemente o motivo do acesso..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-paper-plane" style="margin-right:8px;"></i>Enviar Solicitação
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <footer class="login-footer">
+            <p>© 2026 Banco do Brasil S.A. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+</body>
+</html>

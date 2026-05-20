@@ -2,13 +2,16 @@ import os
 import re
 import json
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from flask import (Flask, render_template, redirect, url_for,
                    session, request, abort, jsonify, flash, send_file)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 
 app = Flask(__name__)
@@ -190,6 +193,148 @@ class ConfiguracaoSistema(db.Model):
     id    = db.Column(db.Integer, primary_key=True)
     chave = db.Column(db.String(100), unique=True, nullable=False)
     valor = db.Column(db.String(255), nullable=False)
+
+
+class SolicitacaoAcesso(db.Model):
+    __tablename__ = 'solicitacoes_acesso'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    nome        = db.Column(db.String(120), nullable=False)
+    email       = db.Column(db.String(120), nullable=False)
+    justificativa = db.Column(db.Text, nullable=True)
+    status      = db.Column(db.String(20), nullable=False, default='pendente')
+    # pendente | aprovado | rejeitado
+    token       = db.Column(db.String(64), unique=True, nullable=True)
+    token_expira = db.Column(db.DateTime, nullable=True)
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    resolvido_em = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id':           self.id,
+            'nome':         self.nome,
+            'email':        self.email,
+            'justificativa': self.justificativa or '',
+            'status':       self.status,
+            'criado_em':    self.criado_em.strftime('%d/%m/%Y %H:%M') if self.criado_em else '',
+            'resolvido_em': self.resolvido_em.strftime('%d/%m/%Y %H:%M') if self.resolvido_em else None,
+        }
+
+
+# ── Serviço de e-mail ──────────────────────────────────────────────────────────
+
+def _smtp_config():
+    """Retorna configuração SMTP a partir das variáveis de ambiente."""
+    return {
+        'host':     os.environ.get('SMTP_HOST', 'smtp.gmail.com'),
+        'port':     int(os.environ.get('SMTP_PORT', 587)),
+        'user':     os.environ.get('SMTP_USER', ''),
+        'password': os.environ.get('SMTP_PASSWORD', ''),
+        'from':     os.environ.get('SMTP_FROM', os.environ.get('SMTP_USER', '')),
+    }
+
+
+def enviar_email(destinatario, assunto, corpo_html):
+    """Envia e-mail via SMTP. Retorna True em caso de sucesso."""
+    cfg = _smtp_config()
+    if not cfg['user'] or not cfg['password']:
+        app.logger.warning('SMTP não configurado — e-mail não enviado.')
+        return False
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = assunto
+        msg['From']    = cfg['from']
+        msg['To']      = destinatario
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+
+        with smtplib.SMTP(cfg['host'], cfg['port'], timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(cfg['user'], cfg['password'])
+            smtp.sendmail(cfg['from'], [destinatario], msg.as_string())
+        return True
+    except Exception as exc:
+        app.logger.error(f'Erro ao enviar e-mail para {destinatario}: {exc}')
+        return False
+
+
+def _base_url():
+    """Retorna a URL base da aplicação."""
+    return os.environ.get('APP_BASE_URL', 'https://riseup.pythonanywhere.com')
+
+
+def email_solicitacao_admin(solicitacao):
+    """Notifica o admin sobre nova solicitação de acesso."""
+    admin_email = os.environ.get('ADMIN_EMAIL', '')
+    if not admin_email:
+        return
+    url_admin = f"{_base_url()}/admin#tab-solicitacoes"
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Nova Solicitação de Acesso</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Uma nova solicitação de acesso foi recebida:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;font-weight:bold;color:#555;width:140px;">Nome:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.nome}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#555;">E-mail:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.email}</td></tr>
+          <tr><td style="padding:8px;font-weight:bold;color:#555;">Justificativa:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.justificativa or '—'}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#555;">Data:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.criado_em.strftime('%d/%m/%Y %H:%M')}</td></tr>
+        </table>
+        <a href="{url_admin}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">
+          Revisar no Painel Admin
+        </a>
+      </div>
+    </div>
+    """
+    enviar_email(admin_email, f'[DISEC] Nova solicitação de acesso — {solicitacao.nome}', corpo)
+
+
+def email_aprovacao(solicitacao, link_definir_senha):
+    """Envia link de definição de senha ao usuário aprovado."""
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Acesso Aprovado</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{solicitacao.nome}</strong>!</p>
+        <p style="color:#333;">Sua solicitação de acesso ao <strong>Portal DISEC</strong> foi aprovada.</p>
+        <p style="color:#333;">Clique no botão abaixo para criar sua senha. O link é válido por <strong>24 horas</strong>.</p>
+        <a href="{link_definir_senha}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">
+          Criar Minha Senha
+        </a>
+        <p style="color:#888;font-size:0.85rem;">Se não solicitou acesso, ignore este e-mail.</p>
+        <p style="color:#aaa;font-size:0.8rem;">Link: {link_definir_senha}</p>
+      </div>
+    </div>
+    """
+    enviar_email(solicitacao.email, '[DISEC] Acesso aprovado — Crie sua senha', corpo)
+
+
+def email_rejeicao(solicitacao):
+    """Notifica o usuário que a solicitação foi rejeitada."""
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Solicitação de Acesso</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{solicitacao.nome}</strong>.</p>
+        <p style="color:#333;">Infelizmente sua solicitação de acesso ao <strong>Portal DISEC</strong>
+           não foi aprovada neste momento.</p>
+        <p style="color:#333;">Em caso de dúvidas, entre em contato com a equipe DISEC.</p>
+      </div>
+    </div>
+    """
+    enviar_email(solicitacao.email, '[DISEC] Solicitação de acesso não aprovada', corpo)
 
 
 def calcular_eficiencia_energetica(consumo_energia, area_util):
@@ -1154,6 +1299,137 @@ def api_usuarios_deletar(usuario_id):
         return jsonify({'erro': 'Você não pode excluir sua própria conta'}), 400
     db.session.delete(u)
     db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ── Solicitação de acesso ──────────────────────────────────────────────────────
+
+@app.route('/solicitar-acesso', methods=['GET', 'POST'])
+def solicitar_acesso():
+    if request.method == 'POST':
+        nome          = request.form.get('nome', '').strip()
+        email         = request.form.get('email', '').strip().lower()
+        justificativa = request.form.get('justificativa', '').strip()
+
+        if not nome or not email:
+            return render_template('solicitar_acesso.html', erro='Nome e e-mail são obrigatórios.')
+
+        # Bloqueia se já existe usuário ativo com esse e-mail
+        if Usuario.query.filter_by(email=email, ativo=True).first():
+            return render_template('solicitar_acesso.html',
+                                   erro='Este e-mail já possui acesso ao sistema.')
+
+        # Bloqueia solicitação pendente duplicada
+        pendente = SolicitacaoAcesso.query.filter_by(email=email, status='pendente').first()
+        if pendente:
+            return render_template('solicitar_acesso.html',
+                                   erro='Já existe uma solicitação pendente para este e-mail.')
+
+        sol = SolicitacaoAcesso(nome=nome, email=email, justificativa=justificativa)
+        db.session.add(sol)
+        db.session.commit()
+
+        email_solicitacao_admin(sol)
+
+        return render_template('solicitar_acesso.html', sucesso=True)
+
+    return render_template('solicitar_acesso.html')
+
+
+@app.route('/definir-senha/<token>', methods=['GET', 'POST'])
+def definir_senha(token):
+    sol = SolicitacaoAcesso.query.filter_by(token=token, status='aprovado').first()
+
+    if not sol:
+        return render_template('definir_senha.html', erro='Link inválido ou já utilizado.')
+
+    if sol.token_expira and datetime.utcnow() > sol.token_expira:
+        return render_template('definir_senha.html', erro='Este link expirou. Solicite um novo acesso.')
+
+    if request.method == 'POST':
+        senha   = request.form.get('senha', '')
+        confirma = request.form.get('confirma', '')
+
+        if len(senha) < 6:
+            return render_template('definir_senha.html', token=token,
+                                   erro='A senha deve ter pelo menos 6 caracteres.')
+        if senha != confirma:
+            return render_template('definir_senha.html', token=token,
+                                   erro='As senhas não coincidem.')
+
+        # Cria o usuário
+        username = sol.email.split('@')[0].replace('.', '_').lower()
+        # Garante username único
+        base = username
+        contador = 1
+        while Usuario.query.filter_by(username=username).first():
+            username = f"{base}{contador}"
+            contador += 1
+
+        u = Usuario(username=username, nome=sol.nome, email=sol.email,
+                    nivel='Consulta', ativo=True)
+        u.set_senha(senha)
+        db.session.add(u)
+
+        # Invalida o token
+        sol.token = None
+        sol.token_expira = None
+        db.session.commit()
+
+        return render_template('definir_senha.html', concluido=True, username=username)
+
+    return render_template('definir_senha.html', token=token, nome=sol.nome)
+
+
+# ── APIs de solicitações (admin) ───────────────────────────────────────────────
+
+@app.route('/api/solicitacoes')
+@gestao_required
+def api_solicitacoes_listar():
+    status = request.args.get('status', '')
+    query  = SolicitacaoAcesso.query
+    if status:
+        query = query.filter_by(status=status)
+    sols = query.order_by(SolicitacaoAcesso.criado_em.desc()).all()
+    return jsonify([s.to_dict() for s in sols])
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/aprovar', methods=['POST'])
+@gestao_required
+def api_solicitacao_aprovar(sol_id):
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status != 'pendente':
+        return jsonify({'erro': 'Solicitação já foi processada.'}), 400
+
+    # Gera token seguro
+    token = uuid.uuid4().hex + uuid.uuid4().hex  # 64 chars
+    sol.status       = 'aprovado'
+    sol.token        = token
+    sol.token_expira = datetime.utcnow() + timedelta(hours=24)
+    sol.resolvido_em = datetime.utcnow()
+    db.session.commit()
+
+    link = f"{_base_url()}/definir-senha/{token}"
+    email_aprovacao(sol, link)
+
+    return jsonify({'ok': True, 'link': link})
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/rejeitar', methods=['POST'])
+@gestao_required
+def api_solicitacao_rejeitar(sol_id):
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status != 'pendente':
+        return jsonify({'erro': 'Solicitação já foi processada.'}), 400
+
+    sol.status       = 'rejeitado'
+    sol.resolvido_em = datetime.utcnow()
+    db.session.commit()
+
+    email_rejeicao(sol)
+
     return jsonify({'ok': True})
 
 
