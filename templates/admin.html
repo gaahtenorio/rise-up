@@ -715,7 +715,7 @@ async function aprovarSolicitacao(id, nome) {
             alert(`✅ Acesso aprovado!\n\nE-mail enviado para ${nome} com o link de criação de senha.\nO link expira em 24 horas.`);
         } else {
             // E-mail falhou — exibe o link para o admin copiar manualmente
-            const copiado = await mostrarLinkManual(nome, data.link);
+            const copiado = await mostrarLinkManual(nome, data.link, data.email_erro);
         }
 
         carregarSolicitacoes();
@@ -725,13 +725,19 @@ async function aprovarSolicitacao(id, nome) {
     }
 }
 
-function mostrarLinkManual(nome, link) {
+function mostrarLinkManual(nome, link, erroDetalhe) {
     return new Promise(resolve => {
         const modal = document.createElement('div');
         modal.style.cssText = `
             position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;
             display:flex;align-items:center;justify-content:center;padding:16px;
         `;
+        const erroHtml = erroDetalhe
+            ? `<p style="color:#991b1b;font-size:.82rem;background:#fee2e2;border-radius:6px;
+                         padding:8px 12px;margin-bottom:12px;word-break:break-all;">
+                   <strong>Erro:</strong> ${erroDetalhe}
+               </p>`
+            : '';
         modal.innerHTML = `
             <div style="background:#fff;border-radius:12px;padding:28px;max-width:520px;width:100%;
                         box-shadow:0 8px 32px rgba(0,0,0,.2);font-family:Montserrat,sans-serif;">
@@ -740,9 +746,9 @@ function mostrarLinkManual(nome, link) {
                     <h3 style="margin:0;font-size:1rem;color:#1e293b;">E-mail não enviado</h3>
                 </div>
                 <p style="color:#475569;font-size:.9rem;margin-bottom:8px;">
-                    O acesso de <strong>${nome}</strong> foi aprovado, mas o e-mail não pôde ser enviado
-                    (verifique as configurações SMTP no servidor).
+                    O acesso de <strong>${nome}</strong> foi aprovado, mas o e-mail não pôde ser enviado.
                 </p>
+                ${erroHtml}
                 <p style="color:#475569;font-size:.9rem;margin-bottom:12px;">
                     Copie o link abaixo e envie manualmente para o usuário. <strong>Válido por 24 horas.</strong>
                 </p>
@@ -758,8 +764,7 @@ function mostrarLinkManual(nome, link) {
                     </button>
                 </div>
                 <div style="text-align:right;">
-                    <button onclick="this.closest('[data-modal]').remove();resolve();"
-                            id="btn-fechar-link-modal"
+                    <button id="btn-fechar-link-modal"
                             style="padding:10px 24px;background:#f1f5f9;color:#475569;border:none;
                                    border-radius:8px;cursor:pointer;font-weight:600;">
                         Fechar
@@ -816,7 +821,7 @@ async function reenviarSolicitacao(id, nome) {
         if (data.email_enviado) {
             alert(`✅ Link reenviado com sucesso para ${nome}!`);
         } else {
-            await mostrarLinkManual(nome, data.link);
+            await mostrarLinkManual(nome, data.link, data.email_erro);
         }
     } catch(err) {
         alert('Erro de conexão.');
