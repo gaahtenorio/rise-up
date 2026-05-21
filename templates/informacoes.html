@@ -78,6 +78,21 @@
         </select>
     </div>
 
+    <div class="info-filter-group">
+        <label class="info-filter-label"><i class="fas fa-sun"></i> Zona Bioclimática</label>
+        <select class="info-filter-select" id="f-zona">
+            <option value="">Todas</option>
+            <option value="1">Zona 1 — Norte úmido</option>
+            <option value="2">Zona 2 — Nordeste litorâneo</option>
+            <option value="3">Zona 3 — Semiárido</option>
+            <option value="4">Zona 4 — Centro-Oeste</option>
+            <option value="5">Zona 5 — Sudeste quente</option>
+            <option value="6">Zona 6 — Sul subtropical</option>
+            <option value="7">Zona 7 — Sul temperado</option>
+            <option value="8">Zona 8 — Serra Gaúcha</option>
+        </select>
+    </div>
+
     <button class="info-filter-reset" id="btn-reset-filters" onclick="resetFiltros()" title="Limpar filtros">
         <i class="fas fa-undo"></i> Limpar
     </button>
@@ -110,13 +125,14 @@
                     <th>Cidade / UF</th>
                     <th>Segmento</th>
                     <th>Classificação BACEN</th>
+                    <th style="text-align:center;">Zona Bioclim.</th>
                     <th style="text-align:center;">Status</th>
                     <th style="text-align:center;">IDI</th>
                     <th style="text-align:center;">Ação</th>
                 </tr>
             </thead>
             <tbody id="info-tbody">
-                <tr><td colspan="8" class="text-center text-muted" style="padding:32px;">
+                <tr><td colspan="9" class="text-center text-muted" style="padding:32px;">
                     <i class="fas fa-spinner fa-spin"></i> Carregando agências...
                 </td></tr>
             </tbody>
@@ -181,6 +197,7 @@ function aplicarFiltros() {
     const seg     = document.getElementById('f-segmento').value;
     const status  = document.getElementById('f-status').value;
     const bacen   = document.getElementById('f-bacen').value;
+    const zona    = document.getElementById('f-zona').value;
 
     let resultado = todasAgencias.filter(ag => {
         if (q && !`${ag.nome} ${ag.prefixo} ${ag.municipio}`.toLowerCase().includes(q)) return false;
@@ -188,6 +205,7 @@ function aplicarFiltros() {
         if (seg    && ag.segmento !== seg)             return false;
         if (status && ag.status !== status)            return false;
         if (bacen  && ag.classificacao_bacen !== bacen) return false;
+        if (zona   && String(ag.zona_bioclimatica) !== zona) return false;
         return true;
     });
 
@@ -217,7 +235,7 @@ function renderTabela(lista) {
     count.textContent = `${lista.length} agência(s) encontrada(s)`;
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:32px;">
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted" style="padding:32px;">
             <i class="fas fa-search" style="font-size:1.5rem;opacity:.3;display:block;margin-bottom:8px;"></i>
             Nenhuma agência encontrada com os filtros aplicados.
         </td></tr>`;
@@ -234,12 +252,17 @@ function renderTabela(lista) {
                           : ag.status === 'Fechada'         ? 'badge-inativo'
                           : 'badge-consulta';
 
+        const zonaHtml = ag.zona_bioclimatica
+            ? `<span class="zona-badge">Z${ag.zona_bioclimatica}</span>`
+            : `<span style="color:var(--text-muted);font-size:.78rem;">—</span>`;
+
         return `<tr class="info-row" onclick="window.location='/detalhes/${ag.prefixo}'" style="cursor:pointer;">
             <td class="fw-bold">${escHtml(ag.prefixo)}</td>
             <td>${escHtml(ag.nome.replace('AGENCIA ','').replace(/\b\w/g, c => c.toUpperCase()))}</td>
             <td class="text-muted">${escHtml(ag.municipio)} / ${escHtml(ag.uf)}</td>
             <td>${escHtml(ag.segmento || '—')}</td>
             <td style="font-size:.78rem;">${escHtml(ag.classificacao_bacen || 'Não classificada')}</td>
+            <td style="text-align:center;">${zonaHtml}</td>
             <td style="text-align:center;"><span class="badge ${statusClass}">${escHtml(ag.status || '—')}</span></td>
             <td style="text-align:center;">${idiHtml}</td>
             <td style="text-align:center;" onclick="event.stopPropagation()">
@@ -261,6 +284,7 @@ function resetFiltros() {
     document.getElementById('f-segmento').value = '';
     document.getElementById('f-status').value   = '';
     document.getElementById('f-bacen').value    = '';
+    document.getElementById('f-zona').value     = '';
     document.getElementById('f-ordem').value    = 'nome';
     aplicarFiltros();
 }
@@ -281,7 +305,7 @@ document.getElementById('info-search-clear').addEventListener('click', function(
 });
 
 // Filtros select disparam aplicarFiltros
-['f-uf','f-segmento','f-status','f-bacen'].forEach(id => {
+['f-uf','f-segmento','f-status','f-bacen','f-zona'].forEach(id => {
     document.getElementById(id).addEventListener('change', aplicarFiltros);
 });
 
@@ -451,6 +475,17 @@ init();
 .idi-ok     { background: #dcfce7; color: #166534; }
 .idi-critico { background: #fee2e2; color: #991b1b; }
 .idi-nd     { background: #f1f5f9; color: var(--text-muted); }
+
+/* ── Zona bioclimática badge ───────────────────────────────────────────── */
+.zona-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: .75rem;
+    background: #fef3c7;
+    color: #92400e;
+}
 
 @media (max-width: 768px) {
     .info-filters-bar { gap: 8px; }

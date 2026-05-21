@@ -48,6 +48,18 @@ CLASSIFICACOES_BACEN = [
 ]
 DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
+# Zonas bioclimáticas brasileiras (NBR 15220) com consumo máximo de referência (kWh/m²·ano)
+ZONAS_BIOCLIMATICAS = {
+    1: {'descricao': 'Norte úmido (Manaus, Belém)',       'consumo_ref': 120},
+    2: {'descricao': 'Nordeste litorâneo',                'consumo_ref': 110},
+    3: {'descricao': 'Semiárido (Petrolina)',             'consumo_ref': 100},
+    4: {'descricao': 'Centro-Oeste (Brasília, Goiânia)',  'consumo_ref':  95},
+    5: {'descricao': 'Sudeste quente (SP interior)',      'consumo_ref':  90},
+    6: {'descricao': 'Sul subtropical (Curitiba)',        'consumo_ref':  85},
+    7: {'descricao': 'Sul temperado (Porto Alegre)',      'consumo_ref':  80},
+    8: {'descricao': 'Serra Gaúcha / frio intenso',       'consumo_ref':  75},
+}
+
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
@@ -106,6 +118,7 @@ class Agencia(db.Model):
     eficiencia_energetica          = db.Column(db.Float, nullable=True)
     area_util                      = db.Column(db.Float, nullable=True)
     idi                            = db.Column(db.Float, nullable=True)
+    zona_bioclimatica              = db.Column(db.Integer, nullable=True)
     residuos_solidos               = db.Column(db.Float, nullable=True)
     num_colaboradores              = db.Column(db.Integer, nullable=True)
     data_ultima_vistoria_bombeiros = db.Column(db.Date, nullable=True)
@@ -118,6 +131,18 @@ class Agencia(db.Model):
     arquivos_dwg       = db.relationship('ArquivoDWG', back_populates='agencia', cascade='all, delete-orphan')
     horarios_saa       = db.relationship('HorarioSAA', back_populates='agencia', cascade='all, delete-orphan')
     vistoria_bombeiros = db.relationship('VistoriaBombeiros', back_populates='agencia', uselist=False, cascade='all, delete-orphan')
+
+    @property
+    def zona_bioclimatica_descricao(self):
+        if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS:
+            return ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['descricao']
+        return None
+
+    @property
+    def zona_bioclimatica_consumo_ref(self):
+        if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS:
+            return ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['consumo_ref']
+        return None
 
     @property
     def endereco(self):
@@ -150,6 +175,9 @@ class Agencia(db.Model):
             'eficiencia_energetica':          self.eficiencia_energetica,
             'area_util':                      self.area_util,
             'idi':                            self.idi,
+            'zona_bioclimatica':              self.zona_bioclimatica,
+            'zona_bioclimatica_descricao':    ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['descricao'] if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS else None,
+            'zona_bioclimatica_consumo_ref':  ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['consumo_ref'] if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS else None,
             'residuos_solidos':               self.residuos_solidos,
             'num_colaboradores':              self.num_colaboradores,
             'data_ultima_vistoria_bombeiros': self.data_ultima_vistoria_bombeiros.strftime('%d/%m/%Y') if self.data_ultima_vistoria_bombeiros else None,
@@ -346,16 +374,59 @@ def email_rejeicao(solicitacao):
 
 
 def calcular_eficiencia_energetica(consumo_energia, area_util):
-    """Calcula eficiência energética em kWh/m².
-    Retorna round(consumo / area, 2) ou None se area_util for zero/None.
+    """Calcula eficiência energética anual em kWh/m²·ano.
+    Retorna round(consumo * 12 / area, 2) ou None se area_util for zero/None.
     """
-    if not area_util:
+    if not consumo_energia or not area_util:
         return None
-    return round(consumo_energia / area_util, 2)
+    return round((consumo_energia * 12) / area_util, 2)
+
+
+def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
+    """Calcula IDI contínuo (1.0–5.0) ajustado pela zona bioclimática.
+
+    Fórmula:
+      efic_anual = (consumo_energia * 12) / area_util   [kWh/m²·ano]
+      ratio      = efic_anual / consumo_ref_zona
+
+    Mapeamento linear contínuo por faixa de ratio:
+      ratio <= 0.00  → IDI 5.0
+      ratio  0.00–0.60 → IDI 5.0–4.0  (linear)
+      ratio  0.60–0.75 → IDI 4.0–3.0  (linear)
+      ratio  0.75–0.90 → IDI 3.0–2.0  (linear)
+      ratio  0.90–1.00 → IDI 2.0–1.0  (linear)
+      ratio >= 1.00  → IDI 1.0
+
+    Retorna None se faltar consumo, área ou zona.
+    """
+    if not consumo_energia or not area_util or not zona_bioclimatica:
+        return None
+    zona = ZONAS_BIOCLIMATICAS.get(zona_bioclimatica)
+    if not zona:
+        return None
+    efic_anual = (consumo_energia * 12) / area_util
+    ratio      = efic_anual / zona['consumo_ref']
+
+    if ratio >= 1.00:
+        idi = 1.0
+    elif ratio >= 0.90:
+        # 0.90–1.00 → 2.0–1.0
+        idi = 2.0 - ((ratio - 0.90) / 0.10) * 1.0
+    elif ratio >= 0.75:
+        # 0.75–0.90 → 3.0–2.0
+        idi = 3.0 - ((ratio - 0.75) / 0.15) * 1.0
+    elif ratio >= 0.60:
+        # 0.60–0.75 → 4.0–3.0
+        idi = 4.0 - ((ratio - 0.60) / 0.15) * 1.0
+    else:
+        # 0.00–0.60 → 5.0–4.0
+        idi = 5.0 - (ratio / 0.60) * 1.0
+
+    return round(max(1.0, min(5.0, idi)), 2)
 
 
 def validar_idi(valor):
-    """Retorna True se 1.0 <= valor <= 5.0."""
+    """Retorna True se valor está entre 1 e 5."""
     try:
         v = float(valor)
         return 1.0 <= v <= 5.0
@@ -373,8 +444,8 @@ def validar_cnpj_formato(cnpj):
 def cor_marcador_idi(idi, limiar):
     """Retorna cor hex para marcador de mapa baseado no IDI.
     - None -> '#6B7280' (cinza)
-    - idi >= limiar -> '#0038A8' (azul)
-    - idi < limiar -> '#E11D48' (vermelho)
+    - idi >= limiar -> '#0038A8' (azul — tolerável/bom)
+    - idi < limiar -> '#E11D48' (vermelho — crítico/alerta)
     """
     if idi is None:
         return '#6B7280'
@@ -400,7 +471,7 @@ def seed_db():
             nivel='Gestão',
             ativo=True
         )
-        admin.set_senha('123')
+        admin.set_senha(os.environ.get('ADMIN_INITIAL_PASSWORD', 'Troque@Esta#Senha1'))
 
         visitante = Usuario(
             username='visitante',
@@ -409,7 +480,7 @@ def seed_db():
             nivel='Consulta',
             ativo=True
         )
-        visitante.set_senha('abc')
+        visitante.set_senha(os.environ.get('VISITANTE_INITIAL_PASSWORD', 'Troque@Esta#Senha2'))
 
         db.session.add_all([admin, visitante])
         db.session.commit()
@@ -581,6 +652,32 @@ def get_stats():
         for a in top_energia_lista
     ]
 
+    # Distribuição por zona bioclimática com IDI médio por zona
+    zona_dist = {}
+    for a in agencias:
+        z = a.zona_bioclimatica
+        if z and z in ZONAS_BIOCLIMATICAS:
+            if z not in zona_dist:
+                zona_dist[z] = {
+                    'zona':        z,
+                    'descricao':   ZONAS_BIOCLIMATICAS[z]['descricao'],
+                    'consumo_ref': ZONAS_BIOCLIMATICAS[z]['consumo_ref'],
+                    'total':       0,
+                    'idi_vals':    [],
+                }
+            zona_dist[z]['total'] += 1
+            if a.idi is not None:
+                zona_dist[z]['idi_vals'].append(a.idi)
+
+    zonas_lista = []
+    for z_num in sorted(zona_dist.keys()):
+        entry = zona_dist[z_num]
+        idi_vals = entry.pop('idi_vals')
+        entry['idi_medio'] = round(sum(idi_vals) / len(idi_vals), 2) if idi_vals else None
+        zonas_lista.append(entry)
+
+    sem_zona = sum(1 for a in agencias if not a.zona_bioclimatica)
+
     return {
         'total':              total,
         'em_reforma':         em_reforma,
@@ -606,6 +703,8 @@ def get_stats():
         'vencidas_lista':     vencidas_lista,
         'top_energia_lista':  top_energia_lista,
         'ranking_efic':       ranking_efic,
+        'zonas_lista':        zonas_lista,
+        'sem_zona':           sem_zona,
     }
 
 
@@ -777,17 +876,15 @@ def api_agencias_criar():
     if cnpj and not validar_cnpj_formato(cnpj):
         return jsonify({'erro': 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX.'}), 400
 
-    # Validate IDI range if provided
-    idi = data.get('idi')
-    if idi is not None and idi != '':
-        try:
-            idi = float(idi)
-            if not validar_idi(idi):
-                return jsonify({'erro': 'O IDI deve estar entre 1,0 e 5,0.'}), 400
-        except (TypeError, ValueError):
-            return jsonify({'erro': 'IDI deve ser um número'}), 400
-    else:
-        idi = None
+    area_util        = float(data['area_util']) if data.get('area_util') not in (None, '') else None
+    consumo_energia  = float(data['consumo_energia']) if data.get('consumo_energia') not in (None, '') else None
+    zona_bioclimatica = int(data['zona_bioclimatica']) if data.get('zona_bioclimatica') not in (None, '') else None
+
+    if zona_bioclimatica is not None and zona_bioclimatica not in ZONAS_BIOCLIMATICAS:
+        return jsonify({'erro': 'Zona bioclimática inválida. Use um valor entre 1 e 8.'}), 400
+
+    eficiencia_energetica = calcular_eficiencia_energetica(consumo_energia, area_util)
+    idi = calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica)
 
     ag = Agencia(
         prefixo=prefixo, nome=nome, municipio=municipio, uf=uf,
@@ -797,14 +894,15 @@ def api_agencias_criar():
         segmento=data.get('segmento', 'Varejo'),
         status=data.get('status', 'Operação Normal'),
         lat=data.get('lat') or None, lng=data.get('lng') or None,
-        consumo_energia=data.get('consumo_energia') or None,
-        consumo_agua=data.get('consumo_agua') or None,
+        consumo_energia=consumo_energia,
+        consumo_agua=float(data['consumo_agua']) if data.get('consumo_agua') not in (None, '') else None,
         acessibilidade=bool(data.get('acessibilidade', True)),
         email_agencia=data.get('email_agencia') or None,
         cnpj=cnpj or None,
-        area_util=float(data['area_util']) if data.get('area_util') not in (None, '') else None,
+        area_util=area_util,
+        zona_bioclimatica=zona_bioclimatica,
         idi=idi,
-        eficiencia_energetica=float(data['eficiencia_energetica']) if data.get('eficiencia_energetica') not in (None, '') else None,
+        eficiencia_energetica=eficiencia_energetica,
         residuos_solidos=float(data['residuos_solidos']) if data.get('residuos_solidos') not in (None, '') else None,
         num_colaboradores=int(data['num_colaboradores']) if data.get('num_colaboradores') not in (None, '') else None,
         classificacao_bacen=data.get('classificacao_bacen') or None,
@@ -849,25 +947,27 @@ def api_agencias_editar(agencia_id):
         ag.cnpj = cnpj
     if 'area_util' in data:
         ag.area_util = float(data['area_util']) if data['area_util'] not in (None, '') else None
-    if 'idi' in data:
-        if data['idi'] not in (None, ''):
+    if 'zona_bioclimatica' in data:
+        if data['zona_bioclimatica'] not in (None, ''):
             try:
-                idi_val = float(data['idi'])
-                if not validar_idi(idi_val):
-                    return jsonify({'erro': 'O IDI deve estar entre 1,0 e 5,0.'}), 400
-                ag.idi = idi_val
+                zb = int(data['zona_bioclimatica'])
+                if zb not in ZONAS_BIOCLIMATICAS:
+                    return jsonify({'erro': 'Zona bioclimática inválida. Use um valor entre 1 e 8.'}), 400
+                ag.zona_bioclimatica = zb
             except (TypeError, ValueError):
-                return jsonify({'erro': 'IDI deve ser um número'}), 400
+                return jsonify({'erro': 'Zona bioclimática deve ser um número inteiro entre 1 e 8.'}), 400
         else:
-            ag.idi = None
-    if 'eficiencia_energetica' in data:
-        ag.eficiencia_energetica = float(data['eficiencia_energetica']) if data['eficiencia_energetica'] not in (None, '') else None
+            ag.zona_bioclimatica = None
     if 'residuos_solidos' in data:
         ag.residuos_solidos = float(data['residuos_solidos']) if data['residuos_solidos'] not in (None, '') else None
     if 'num_colaboradores' in data:
         ag.num_colaboradores = int(data['num_colaboradores']) if data['num_colaboradores'] not in (None, '') else None
     if 'classificacao_bacen' in data:
         ag.classificacao_bacen = str(data['classificacao_bacen']).strip() or None
+
+    # Recalcula eficiência energética e IDI automaticamente pela zona bioclimática
+    ag.eficiencia_energetica = calcular_eficiencia_energetica(ag.consumo_energia, ag.area_util)
+    ag.idi = calcular_idi_por_zona(ag.consumo_energia, ag.area_util, ag.zona_bioclimatica)
 
     ag.atualizado_em = datetime.utcnow()
     db.session.commit()
@@ -1212,6 +1312,17 @@ def api_config_limiar_idi_get():
     return jsonify({'limiar_idi': limiar})
 
 
+@app.route('/api/config/zonas-bioclimaticas', methods=['GET'])
+@login_required
+def api_zonas_bioclimaticas():
+    """Retorna a lista de zonas bioclimáticas com descrição e consumo de referência."""
+    zonas = [
+        {'zona': k, 'descricao': v['descricao'], 'consumo_ref': v['consumo_ref']}
+        for k, v in ZONAS_BIOCLIMATICAS.items()
+    ]
+    return jsonify(zonas)
+
+
 @app.route('/api/config/limiar-idi', methods=['PUT'])
 @gestao_required
 def api_config_limiar_idi_put():
@@ -1224,8 +1335,8 @@ def api_config_limiar_idi_put():
     except (TypeError, ValueError):
         return jsonify({'erro': 'O limiar deve ser um número'}), 400
 
-    if not (1.0 <= limiar <= 5.0):
-        return jsonify({'erro': 'O limiar deve estar entre 1,0 e 5,0.'}), 400
+    if not (0.1 <= limiar <= 5.0):
+        return jsonify({'erro': 'O limiar deve estar entre 0,1 e 5,0.'}), 400
 
     config = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
     if config:

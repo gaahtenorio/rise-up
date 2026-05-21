@@ -29,7 +29,7 @@
         <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
         <div class="stat-data">
             <span class="stat-value">{{ stats.idi_critico }}</span>
-            <span class="stat-label">IDI Crítico (&lt; {{ stats.limiar_idi }}) — Em Reforma</span>
+            <span class="stat-label">IDI Crítico (&lt; {{ stats.limiar_idi }})</span>
         </div>
         <i class="fas fa-arrow-right stat-card-arrow"></i>
     </a>
@@ -363,6 +363,74 @@
     </div>
 
 </div>
+
+{# ── Seção: Zonas Bioclimáticas ───────────────────────────────────────── #}
+{% if stats.zonas_lista %}
+<div class="card" style="margin-bottom:20px;">
+    <h3 class="card-title">
+        <i class="fas fa-sun" style="color:#f59e0b;"></i>
+        Distribuição por Zona Bioclimática
+        <span style="font-size:.78rem;font-weight:500;color:var(--text-muted);margin-left:8px;">
+            NBR 15220 — {{ stats.sem_zona }} agência(s) sem zona cadastrada
+        </span>
+    </h3>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width:60px;">Zona</th>
+                    <th>Região / Descrição</th>
+                    <th style="text-align:right;">Consumo Ref. (kWh/m²·ano)</th>
+                    <th style="text-align:center;">Agências</th>
+                    <th style="text-align:center;">IDI Médio</th>
+                    <th style="text-align:center;">Distribuição</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% set max_zona_total = stats.zonas_lista | map(attribute='total') | max %}
+            {% set zona_cores = ['#0038A8','#1e40af','#2563eb','#3b82f6','#0891b2','#0d9488','#16a34a','#65a30d'] %}
+            {% for z in stats.zonas_lista %}
+            <tr>
+                <td style="text-align:center;">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;
+                                 width:28px;height:28px;border-radius:50%;font-weight:800;font-size:.82rem;
+                                 background:{{ zona_cores[(z.zona - 1) % zona_cores|length] }};color:#fff;">
+                        {{ z.zona }}
+                    </span>
+                </td>
+                <td style="font-size:.85rem;">{{ z.descricao }}</td>
+                <td style="text-align:right;font-weight:600;color:var(--text-muted);font-size:.82rem;">
+                    ~ {{ z.consumo_ref }}
+                </td>
+                <td style="text-align:center;font-weight:700;">{{ z.total }}</td>
+                <td style="text-align:center;">
+                    {% if z.idi_medio is not none %}
+                    <span style="padding:2px 10px;border-radius:12px;font-weight:700;font-size:.8rem;
+                                 background:{% if z.idi_medio < 2 %}#fee2e2;color:#991b1b{% elif z.idi_medio < 3 %}#fef3c7;color:#92400e{% else %}#dcfce7;color:#166534{% endif %};">
+                        {{ z.idi_medio }}
+                    </span>
+                    {% else %}
+                    <span style="color:var(--text-muted);font-size:.8rem;">—</span>
+                    {% endif %}
+                </td>
+                <td style="min-width:120px;">
+                    <div style="height:7px;border-radius:4px;background:#f1f5f9;overflow:hidden;">
+                        <div style="height:100%;
+                                    width:{{ ((z.total / max_zona_total) * 100)|round|int }}%;
+                                    background:{{ zona_cores[(z.zona - 1) % zona_cores|length] }};
+                                    border-radius:4px;"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;">
+                        {{ ((z.total / stats.total) * 100)|round|int }}% do total
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 
 {# ── Classificação BACEN ──────────────────────────────────────────────── #}
 <div class="card" style="margin-bottom:20px;">
