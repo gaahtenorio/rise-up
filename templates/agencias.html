@@ -165,8 +165,6 @@
     let gMarkers = [];
     let gLimiarIDI = 3.0;
 
-    const GMAPS_KEY = '{{ google_maps_key }}';
-
     const estadosPorRegiao = {
         'Norte':        ['AC','AM','AP','PA','RO','RR','TO'],
         'Nordeste':     ['AL','BA','CE','MA','PB','PE','PI','RN','SE'],
@@ -175,30 +173,26 @@
         'Sul':          ['PR','RS','SC']
     };
 
-    // ── Lê parâmetro de filtro rápido vindo da página inicial ──────────────
+    // ── Lê parâmetro de filtro rápido vindo do dashboard ──────────────────
     function aplicarFiltroRapido() {
         const params = new URLSearchParams(window.location.search);
         const filtro = params.get('filter');
         if (!filtro) return;
 
-        // Desmarca todos os status primeiro
         const statusCbs = [...document.querySelectorAll('.check-list input[type=checkbox]')]
             .filter(cb => ['Operação Normal','Em Reforma','Fechada'].includes(cb.value));
 
         if (filtro === 'todas') {
-            // Garante que tudo está marcado (padrão)
             statusCbs.forEach(cb => cb.checked = true);
         } else if (filtro === 'operando') {
-            // Apenas "Operação Normal"
             statusCbs.forEach(cb => { cb.checked = cb.value === 'Operação Normal'; });
         } else if (filtro === 'idi_critico') {
-            // Todos os status, mas o mapa vai destacar os críticos
             statusCbs.forEach(cb => cb.checked = true);
-            // Marca visualmente que estamos filtrando por IDI crítico
             window._filtroIDICritico = true;
         }
     }
 
+    // ── Callback do Google Maps — ponto único de entrada ──────────────────
     async function initMap() {
         gMap = new google.maps.Map(document.getElementById('google-map-agencias'), {
             center: { lat: -14.235, lng: -51.925 },
@@ -208,30 +202,9 @@
             fullscreenControl: true
         });
 
-        // Atualiza o limiar com o valor do servidor
+        // Busca o limiar IDI configurado
         try {
-            const res = await fetch('/api/config/limiar-idi');
-            const data = await res.json();
-            if (data && data.limiar_idi != null) {
-                gLimiarIDI = parseFloat(data.limiar_idi);
-            }
-        } catch (e) { /* usa padrão 3.0 */ }
-
-        // Se a busca já terminou antes do Maps carregar, renderiza agora
-        if (window._agenciasCarregadas) {
-            renderMapa(window._agenciasCarregadas);
-        } else {
-            // Maps carregou primeiro — dispara a busca completa
-            aplicarFiltroRapido();
-            buscarAgencias();
-        }
-    }
-
-    // Roda sempre que o DOM estiver pronto, independente do Maps
-    document.addEventListener('DOMContentLoaded', async function() {
-        // Busca o limiar antecipadamente
-        try {
-            const res = await fetch('/api/config/limiar-idi');
+            const res  = await fetch('/api/config/limiar-idi');
             const data = await res.json();
             if (data && data.limiar_idi != null) {
                 gLimiarIDI = parseFloat(data.limiar_idi);
@@ -239,14 +212,10 @@
         } catch (e) { /* usa padrão 3.0 */ }
 
         aplicarFiltroRapido();
-        await buscarAgencias();
+        buscarAgencias();
+    }
 
-        // Se o Maps já carregou enquanto buscávamos, renderiza os marcadores
-        if (gMap && window._agenciasCarregadas) {
-            renderMapa(window._agenciasCarregadas);
-        }
-    });
-
+    // ── Marcadores ────────────────────────────────────────────────────────
     function limparMarcadores() {
         gMarkers.forEach(m => m.setMap(null));
         gMarkers = [];
@@ -254,18 +223,16 @@
 
     function corPorIDI(idi, limiar) {
         if (idi == null) return '#6B7280';
-        if (idi >= limiar) return '#0038A8';
-        return '#E11D48';
+        return idi >= limiar ? '#0038A8' : '#E11D48';
     }
 
     function atualizarLimiarIDI(novoLimiar) {
         gLimiarIDI = parseFloat(novoLimiar);
         gMarkers.forEach(m => {
-            const cor = corPorIDI(m._idi, gLimiarIDI);
             m.setIcon({
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 9,
-                fillColor: cor,
+                fillColor: corPorIDI(m._idi, gLimiarIDI),
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
                 strokeWeight: 2
@@ -276,8 +243,6 @@
     function adicionarMarcador(ag) {
         if (!ag.lat || !ag.lng) return;
 
-        const cor = corPorIDI(ag.idi, gLimiarIDI);
-
         const marker = new google.maps.Marker({
             position: { lat: ag.lat, lng: ag.lng },
             map: gMap,
@@ -285,7 +250,7 @@
             icon: {
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 9,
-                fillColor: cor,
+                fillColor: corPorIDI(ag.idi, gLimiarIDI),
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
                 strokeWeight: 2
@@ -305,55 +270,54 @@
 
         marker.addListener('mouseover', () => infoWindow.open(gMap, marker));
         marker.addListener('mouseout',  () => infoWindow.close());
-        marker.addListener('click', () => {
-            window.location.href = '/detalhes/' + ag.prefixo;
-        });
+        marker.addListener('click',     () => { window.location.href = '/detalhes/' + ag.prefixo; });
 
         gMarkers.push(marker);
     }
 
+    // ── Busca e renderização ──────────────────────────────────────────────
     async function buscarAgencias() {
-        const q  = document.getElementById('search-input').value.trim();
-        const uf = document.getElementById('filter-estado').value;
+        const q                  = document.getElementById('search-input').value.trim();
+        const uf                 = document.getElementById('filter-estado').value;
         const classificacaoBacen = document.getElementById('filter-classificacao-bacen').value;
 
         const params = new URLSearchParams();
-        if (q)  params.append('q', q);
-        if (uf) params.append('uf', uf);
+        if (q)                  params.append('q', q);
+        if (uf)                 params.append('uf', uf);
         if (classificacaoBacen) params.append('classificacao_bacen', classificacaoBacen);
 
+        let agencias;
         try {
-            const res    = await fetch('/api/agencias?' + params.toString());
-            let agencias = await res.json();
-
-            const segsSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
-                .filter(cb => cb.checked && ['Varejo','Empresa','Agronegócio','Estilo','Governo'].includes(cb.value))
-                .map(cb => cb.value);
-            if (segsSel.length < 5)
-                agencias = agencias.filter(ag => !ag.segmento || segsSel.includes(ag.segmento));
-
-            const statusSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
-                .filter(cb => cb.checked && ['Operação Normal','Em Reforma','Fechada'].includes(cb.value))
-                .map(cb => cb.value);
-            if (statusSel.length < 3)
-                agencias = agencias.filter(ag => !ag.status || statusSel.includes(ag.status));
-
-            // Filtro especial: IDI crítico (agências em reforma)
-            if (window._filtroIDICritico) {
-                agencias = agencias.filter(ag => ag.idi != null && ag.idi < gLimiarIDI);
-            }
-
-            // Guarda para uso posterior pelo mapa (caso Maps ainda não tenha carregado)
-            window._agenciasCarregadas = agencias;
-
-            renderTabela(agencias);
-            renderMapa(agencias);
-
-            document.getElementById('resultado-count').textContent =
-                `${agencias.length} agência(s) encontrada(s)`;
-        } catch(err) {
-            console.error('Erro na busca:', err);
+            const res = await fetch('/api/agencias?' + params.toString());
+            agencias  = await res.json();
+        } catch (err) {
+            document.getElementById('resultado-count').textContent = 'Erro ao carregar agências.';
+            return;
         }
+
+        // Filtros client-side: segmento
+        const segsSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+            .filter(cb => cb.checked && ['Varejo','Empresa','Agronegócio','Estilo','Governo'].includes(cb.value))
+            .map(cb => cb.value);
+        if (segsSel.length < 5)
+            agencias = agencias.filter(ag => !ag.segmento || segsSel.includes(ag.segmento));
+
+        // Filtros client-side: status
+        const statusSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+            .filter(cb => cb.checked && ['Operação Normal','Em Reforma','Fechada'].includes(cb.value))
+            .map(cb => cb.value);
+        if (statusSel.length < 3)
+            agencias = agencias.filter(ag => !ag.status || statusSel.includes(ag.status));
+
+        // Filtro especial: IDI crítico (vindo do dashboard)
+        if (window._filtroIDICritico)
+            agencias = agencias.filter(ag => ag.idi != null && ag.idi < gLimiarIDI);
+
+        renderTabela(agencias);
+        renderMapa(agencias);
+
+        document.getElementById('resultado-count').textContent =
+            `${agencias.length} agência(s) encontrada(s)`;
     }
 
     function renderTabela(agencias) {
@@ -403,12 +367,13 @@
         return 'badge-consulta';
     }
 
+    // ── Filtro de estados por região ──────────────────────────────────────
     function updateStates() {
         const regiao = document.getElementById('filter-regiao').value;
         const sel    = document.getElementById('filter-estado');
-        sel.innerHTML = '<option value="">Todos os Estados</option>';
         if (regiao && estadosPorRegiao[regiao]) {
             sel.disabled = false;
+            sel.innerHTML = '<option value="">Todos os Estados</option>';
             estadosPorRegiao[regiao].forEach(uf => {
                 const opt = document.createElement('option');
                 opt.value = uf; opt.text = uf;
@@ -420,6 +385,7 @@
         }
     }
 
+    // ── Painel de filtros ─────────────────────────────────────────────────
     const filtersPanel = document.getElementById('filters-panel');
     const toggleBtn    = document.getElementById('toggle-filters');
     const toggleIcon   = toggleBtn.querySelector('i');
@@ -429,11 +395,10 @@
         toggleBtn.classList.toggle('collapsed');
         toggleIcon.classList.toggle('fa-chevron-left');
         toggleIcon.classList.toggle('fa-chevron-right');
-        setTimeout(() => {
-            if (gMap) google.maps.event.trigger(gMap, 'resize');
-        }, 320);
+        setTimeout(() => { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 320);
     });
 
+    // ── Alternar mapa / lista ─────────────────────────────────────────────
     function switchView(view) {
         document.getElementById('map-view').style.display  = view === 'map'  ? 'block' : 'none';
         document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
