@@ -208,41 +208,44 @@
             fullscreenControl: true
         });
 
-        // Fetch current limiar from API before loading markers
+        // Atualiza o limiar com o valor do servidor
         try {
             const res = await fetch('/api/config/limiar-idi');
             const data = await res.json();
             if (data && data.limiar_idi != null) {
                 gLimiarIDI = parseFloat(data.limiar_idi);
             }
-        } catch (e) {
-            console.warn('Não foi possível obter o limiar IDI; usando padrão 3.0', e);
-        }
+        } catch (e) { /* usa padrão 3.0 */ }
 
-        // Renderiza o mapa com os dados já carregados (se buscarAgencias já rodou)
+        // Se a busca já terminou antes do Maps carregar, renderiza agora
         if (window._agenciasCarregadas) {
             renderMapa(window._agenciasCarregadas);
+        } else {
+            // Maps carregou primeiro — dispara a busca completa
+            aplicarFiltroRapido();
+            buscarAgencias();
         }
     }
 
-    // Inicialização independente do Google Maps
-    async function inicializarPagina() {
-        // Busca o limiar IDI (se o Maps ainda não carregou)
-        if (!gMap) {
-            try {
-                const res = await fetch('/api/config/limiar-idi');
-                const data = await res.json();
-                if (data && data.limiar_idi != null) {
-                    gLimiarIDI = parseFloat(data.limiar_idi);
-                }
-            } catch (e) { /* usa padrão 3.0 */ }
-        }
+    // Roda sempre que o DOM estiver pronto, independente do Maps
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Busca o limiar antecipadamente
+        try {
+            const res = await fetch('/api/config/limiar-idi');
+            const data = await res.json();
+            if (data && data.limiar_idi != null) {
+                gLimiarIDI = parseFloat(data.limiar_idi);
+            }
+        } catch (e) { /* usa padrão 3.0 */ }
 
         aplicarFiltroRapido();
-        buscarAgencias();
-    }
+        await buscarAgencias();
 
-    document.addEventListener('DOMContentLoaded', inicializarPagina);
+        // Se o Maps já carregou enquanto buscávamos, renderiza os marcadores
+        if (gMap && window._agenciasCarregadas) {
+            renderMapa(window._agenciasCarregadas);
+        }
+    });
 
     function limparMarcadores() {
         gMarkers.forEach(m => m.setMap(null));
