@@ -2,13 +2,24 @@ import os
 import re
 import json
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from flask import (Flask, render_template, redirect, url_for,
                    session, request, abort, jsonify, flash, send_file)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+
+# Carrega variáveis do .env em desenvolvimento local (no PythonAnywhere as vars
+# são configuradas pelo painel e este bloco é ignorado silenciosamente)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 
 app = Flask(__name__)
@@ -36,6 +47,18 @@ CLASSIFICACOES_BACEN = [
     'Correspondente Bancário',
 ]
 DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+
+# Zonas bioclimáticas brasileiras (NBR 15220) com consumo máximo de referência (kWh/m²·ano)
+ZONAS_BIOCLIMATICAS = {
+    1: {'descricao': 'Norte úmido (Manaus, Belém)',       'consumo_ref': 120},
+    2: {'descricao': 'Nordeste litorâneo',                'consumo_ref': 110},
+    3: {'descricao': 'Semiárido (Petrolina)',             'consumo_ref': 100},
+    4: {'descricao': 'Centro-Oeste (Brasília, Goiânia)',  'consumo_ref':  95},
+    5: {'descricao': 'Sudeste quente (SP interior)',      'consumo_ref':  90},
+    6: {'descricao': 'Sul subtropical (Curitiba)',        'consumo_ref':  85},
+    7: {'descricao': 'Sul temperado (Porto Alegre)',      'consumo_ref':  80},
+    8: {'descricao': 'Serra Gaúcha / frio intenso',       'consumo_ref':  75},
+}
 
 
 class Usuario(db.Model):
@@ -95,6 +118,7 @@ class Agencia(db.Model):
     eficiencia_energetica          = db.Column(db.Float, nullable=True)
     area_util                      = db.Column(db.Float, nullable=True)
     idi                            = db.Column(db.Float, nullable=True)
+    zona_bioclimatica              = db.Column(db.Integer, nullable=True)
     residuos_solidos               = db.Column(db.Float, nullable=True)
     num_colaboradores              = db.Column(db.Integer, nullable=True)
     data_ultima_vistoria_bombeiros = db.Column(db.Date, nullable=True)
@@ -107,6 +131,18 @@ class Agencia(db.Model):
     arquivos_dwg       = db.relationship('ArquivoDWG', back_populates='agencia', cascade='all, delete-orphan')
     horarios_saa       = db.relationship('HorarioSAA', back_populates='agencia', cascade='all, delete-orphan')
     vistoria_bombeiros = db.relationship('VistoriaBombeiros', back_populates='agencia', uselist=False, cascade='all, delete-orphan')
+
+    @property
+    def zona_bioclimatica_descricao(self):
+        if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS:
+            return ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['descricao']
+        return None
+
+    @property
+    def zona_bioclimatica_consumo_ref(self):
+        if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS:
+            return ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['consumo_ref']
+        return None
 
     @property
     def endereco(self):
@@ -139,6 +175,9 @@ class Agencia(db.Model):
             'eficiencia_energetica':          self.eficiencia_energetica,
             'area_util':                      self.area_util,
             'idi':                            self.idi,
+            'zona_bioclimatica':              self.zona_bioclimatica,
+            'zona_bioclimatica_descricao':    ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['descricao'] if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS else None,
+            'zona_bioclimatica_consumo_ref':  ZONAS_BIOCLIMATICAS[self.zona_bioclimatica]['consumo_ref'] if self.zona_bioclimatica and self.zona_bioclimatica in ZONAS_BIOCLIMATICAS else None,
             'residuos_solidos':               self.residuos_solidos,
             'num_colaboradores':              self.num_colaboradores,
             'data_ultima_vistoria_bombeiros': self.data_ultima_vistoria_bombeiros.strftime('%d/%m/%Y') if self.data_ultima_vistoria_bombeiros else None,
@@ -192,20 +231,252 @@ class ConfiguracaoSistema(db.Model):
     valor = db.Column(db.String(255), nullable=False)
 
 
+class SolicitacaoAcesso(db.Model):
+    __tablename__ = 'solicitacoes_acesso'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    nome        = db.Column(db.String(120), nullable=False)
+    email       = db.Column(db.String(120), nullable=False)
+    justificativa = db.Column(db.Text, nullable=True)
+    status      = db.Column(db.String(20), nullable=False, default='pendente')
+    # pendente | aprovado | rejeitado
+    token       = db.Column(db.String(64), unique=True, nullable=True)
+    token_expira = db.Column(db.DateTime, nullable=True)
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    resolvido_em = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id':           self.id,
+            'nome':         self.nome,
+            'email':        self.email,
+            'justificativa': self.justificativa or '',
+            'status':       self.status,
+            'criado_em':    self.criado_em.strftime('%d/%m/%Y %H:%M') if self.criado_em else '',
+            'resolvido_em': self.resolvido_em.strftime('%d/%m/%Y %H:%M') if self.resolvido_em else None,
+        }
+
+
+# ── Serviço de e-mail ──────────────────────────────────────────────────────────
+
+def _smtp_config():
+    """Retorna configuração SMTP a partir das variáveis de ambiente."""
+    return {
+        'host':     os.environ.get('SMTP_HOST', 'smtp.gmail.com'),
+        'port':     int(os.environ.get('SMTP_PORT', 587)),
+        'user':     os.environ.get('SMTP_USER', ''),
+        'password': os.environ.get('SMTP_PASSWORD', ''),
+        'from':     os.environ.get('SMTP_FROM', os.environ.get('SMTP_USER', '')),
+    }
+
+
+def enviar_email(destinatario, assunto, corpo_html):
+    """Envia e-mail via SMTP. Retorna True em caso de sucesso."""
+    cfg = _smtp_config()
+    if not cfg['user'] or not cfg['password']:
+        app.logger.warning('SMTP não configurado — e-mail não enviado.')
+        return False
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = assunto
+        msg['From']    = cfg['from']
+        msg['To']      = destinatario
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+
+        with smtplib.SMTP(cfg['host'], cfg['port'], timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(cfg['user'], cfg['password'])
+            smtp.sendmail(cfg['from'], [destinatario], msg.as_string())
+        app.logger.info(f'E-mail enviado com sucesso para {destinatario} — assunto: {assunto}')
+        return True
+    except smtplib.SMTPAuthenticationError as exc:
+        app.logger.error(f'Falha de autenticação SMTP ao enviar para {destinatario}: {exc}')
+        return False
+    except smtplib.SMTPRecipientsRefused as exc:
+        app.logger.error(f'Destinatário recusado pelo servidor SMTP ({destinatario}): {exc}')
+        return False
+    except Exception as exc:
+        app.logger.error(f'Erro ao enviar e-mail para {destinatario}: {exc}')
+        return False
+
+
+def _base_url():
+    """Retorna a URL base da aplicação."""
+    return os.environ.get('APP_BASE_URL', 'https://riseup.pythonanywhere.com')
+
+
+def email_solicitacao_admin(solicitacao):
+    """Notifica o admin sobre nova solicitação de acesso."""
+    admin_email = os.environ.get('ADMIN_EMAIL', '')
+    if not admin_email:
+        return
+    url_admin = f"{_base_url()}/admin#tab-solicitacoes"
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Nova Solicitação de Acesso</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Uma nova solicitação de acesso foi recebida:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;font-weight:bold;color:#555;width:140px;">Nome:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.nome}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#555;">E-mail:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.email}</td></tr>
+          <tr><td style="padding:8px;font-weight:bold;color:#555;">Justificativa:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.justificativa or '—'}</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#555;">Data:</td>
+              <td style="padding:8px;color:#333;">{solicitacao.criado_em.strftime('%d/%m/%Y %H:%M')}</td></tr>
+        </table>
+        <a href="{url_admin}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">
+          Revisar no Painel Admin
+        </a>
+      </div>
+    </div>
+    """
+    enviar_email(admin_email, f'[DISEC] Nova solicitação de acesso — {solicitacao.nome}', corpo)
+
+
+def email_aprovacao(solicitacao, link_definir_senha):
+    """Envia link de definição de senha ao usuário aprovado."""
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Acesso Aprovado</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{solicitacao.nome}</strong>!</p>
+        <p style="color:#333;">Sua solicitação de acesso ao <strong>Portal DISEC</strong> foi aprovada.</p>
+        <p style="color:#333;">Clique no botão abaixo para criar sua senha. O link é válido por <strong>24 horas</strong>.</p>
+        <a href="{link_definir_senha}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">
+          Criar Minha Senha
+        </a>
+        <p style="color:#888;font-size:0.85rem;">Se não solicitou acesso, ignore este e-mail.</p>
+        <p style="color:#aaa;font-size:0.8rem;">Link: {link_definir_senha}</p>
+      </div>
+    </div>
+    """
+    enviar_email(solicitacao.email, '[DISEC] Acesso aprovado — Crie sua senha', corpo)
+
+
+def email_rejeicao(solicitacao):
+    """Notifica o usuário que a solicitação foi rejeitada."""
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Solicitação de Acesso</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{solicitacao.nome}</strong>.</p>
+        <p style="color:#333;">Infelizmente sua solicitação de acesso ao <strong>Portal DISEC</strong>
+           não foi aprovada neste momento.</p>
+        <p style="color:#333;">Em caso de dúvidas, entre em contato com a equipe DISEC.</p>
+      </div>
+    </div>
+    """
+    enviar_email(solicitacao.email, '[DISEC] Solicitação de acesso não aprovada', corpo)
+
+
+def email_boas_vindas(usuario, senha_temporaria):
+    """Envia e-mail de boas-vindas com credenciais ao usuário criado pelo admin."""
+    url_login = f"{_base_url()}/login"
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Bem-vindo(a)!</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{usuario.nome}</strong>!</p>
+        <p style="color:#333;">Sua conta no <strong>Portal DISEC</strong> foi criada com sucesso.
+           Utilize as credenciais abaixo para acessar o sistema:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;width:140px;background:#f0f0f0;">Usuário:</td>
+            <td style="padding:10px;color:#333;background:#fff;font-family:monospace;">{usuario.username}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;background:#f0f0f0;">Senha temporária:</td>
+            <td style="padding:10px;color:#333;background:#fff;font-family:monospace;">{senha_temporaria}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;background:#f0f0f0;">Nível de acesso:</td>
+            <td style="padding:10px;color:#333;background:#fff;">{usuario.nivel}</td>
+          </tr>
+        </table>
+        <p style="color:#c0392b;font-size:0.9rem;">
+          ⚠️ Por segurança, altere sua senha após o primeiro acesso.
+        </p>
+        <a href="{url_login}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">
+          Acessar o Portal
+        </a>
+        <p style="color:#888;font-size:0.85rem;">Se você não esperava este e-mail, entre em contato com a equipe DISEC.</p>
+      </div>
+    </div>
+    """
+    enviar_email(usuario.email, '[DISEC] Suas credenciais de acesso', corpo)
+
+
 def calcular_eficiencia_energetica(consumo_energia, area_util):
-    """Calcula eficiência energética em kWh/m².
+    """Calcula eficiência energética mensal em kWh/m².
     Retorna round(consumo / area, 2) ou None se area_util for zero/None.
     """
-    if not area_util:
+    if not consumo_energia or not area_util:
         return None
     return round(consumo_energia / area_util, 2)
 
 
+def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
+    """Calcula IDI contínuo (1.0–5.0) ajustado pela zona bioclimática.
+
+    Fórmula:
+      efic_mensal = consumo_energia / area_util   [kWh/m²·mês]
+      ratio       = efic_mensal / consumo_ref_zona
+
+    Mapeamento linear contínuo por faixa de ratio:
+      ratio <= 0.00  → IDI 5.0
+      ratio  0.00–0.60 → IDI 5.0–4.0  (linear)
+      ratio  0.60–0.75 → IDI 4.0–3.0  (linear)
+      ratio  0.75–0.90 → IDI 3.0–2.0  (linear)
+      ratio  0.90–1.00 → IDI 2.0–1.0  (linear)
+      ratio >= 1.00  → IDI 1.0
+
+    Retorna None se faltar consumo, área ou zona.
+    """
+    if not consumo_energia or not area_util or not zona_bioclimatica:
+        return None
+    zona = ZONAS_BIOCLIMATICAS.get(zona_bioclimatica)
+    if not zona:
+        return None
+    efic_mensal = consumo_energia / area_util
+    ratio       = efic_mensal / zona['consumo_ref']
+
+    if ratio >= 1.00:
+        idi = 1.0
+    elif ratio >= 0.90:
+        # 0.90–1.00 → 2.0–1.0
+        idi = 2.0 - ((ratio - 0.90) / 0.10) * 1.0
+    elif ratio >= 0.75:
+        # 0.75–0.90 → 3.0–2.0
+        idi = 3.0 - ((ratio - 0.75) / 0.15) * 1.0
+    elif ratio >= 0.60:
+        # 0.60–0.75 → 4.0–3.0
+        idi = 4.0 - ((ratio - 0.60) / 0.15) * 1.0
+    else:
+        # 0.00–0.60 → 5.0–4.0
+        idi = 5.0 - (ratio / 0.60) * 1.0
+
+    return round(max(1.0, min(5.0, idi)), 2)
+
+
 def validar_idi(valor):
-    """Retorna True se 1.0 <= valor <= 10.0."""
+    """Retorna True se valor está entre 1 e 5."""
     try:
         v = float(valor)
-        return 1.0 <= v <= 10.0
+        return 1.0 <= v <= 5.0
     except (TypeError, ValueError):
         return False
 
@@ -220,8 +491,8 @@ def validar_cnpj_formato(cnpj):
 def cor_marcador_idi(idi, limiar):
     """Retorna cor hex para marcador de mapa baseado no IDI.
     - None -> '#6B7280' (cinza)
-    - idi >= limiar -> '#0038A8' (azul)
-    - idi < limiar -> '#E11D48' (vermelho)
+    - idi >= limiar -> '#0038A8' (azul — tolerável/bom)
+    - idi < limiar -> '#E11D48' (vermelho — crítico/alerta)
     """
     if idi is None:
         return '#6B7280'
@@ -247,7 +518,7 @@ def seed_db():
             nivel='Gestão',
             ativo=True
         )
-        admin.set_senha('123')
+        admin.set_senha(os.environ.get('ADMIN_INITIAL_PASSWORD', 'Troque@Esta#Senha1'))
 
         visitante = Usuario(
             username='visitante',
@@ -256,7 +527,7 @@ def seed_db():
             nivel='Consulta',
             ativo=True
         )
-        visitante.set_senha('abc')
+        visitante.set_senha(os.environ.get('VISITANTE_INITIAL_PASSWORD', 'Troque@Esta#Senha2'))
 
         db.session.add_all([admin, visitante])
         db.session.commit()
@@ -376,6 +647,7 @@ def get_stats():
     top_criticos = [{'prefixo': a.prefixo, 'nome': a.nome, 'idi': a.idi,
                      'municipio': a.municipio, 'uf': a.uf} for a in criticos]
 
+    # Ranking eficiência energética por UF (top 5 piores = maior consumo/m²)
     com_efic_ags = [(a.uf, a.eficiencia_energetica) for a in agencias if a.eficiencia_energetica]
     uf_efic = {}
     for uf, efic in com_efic_ags:
@@ -387,27 +659,132 @@ def get_stats():
         key=lambda x: x['media'], reverse=True
     )[:6]
 
+    # Listas detalhadas para as tabelas do dashboard
+    idi_critico_lista = sorted(
+        [a for a in com_idi if a.idi < limiar_idi],
+        key=lambda a: a.idi
+    )
+
+    em_reforma_lista = [a for a in agencias if a.status == 'Em Reforma']
+
+    vencidas_lista = []
+    for a in com_vistoria:
+        v = a.vistoria_bombeiros
+        if v.data_validade and v.data_validade < hoje:
+            dias_vencida = (hoje - v.data_validade).days
+            vencidas_lista.append({
+                'prefixo':       a.prefixo,
+                'nome':          a.nome,
+                'municipio':     a.municipio,
+                'uf':            a.uf,
+                'protocolo':     v.protocolo,
+                'data_validade': v.data_validade.strftime('%d/%m/%Y'),
+                'dias_vencida':  dias_vencida,
+            })
+    vencidas_lista.sort(key=lambda x: x['dias_vencida'], reverse=True)
+
+    top_energia_lista = sorted(
+        [a for a in agencias if a.consumo_energia],
+        key=lambda a: a.consumo_energia,
+        reverse=True
+    )[:5]
+    top_energia_lista = [
+        {
+            'prefixo': a.prefixo,
+            'nome':    a.nome,
+            'uf':      a.uf,
+            'consumo': a.consumo_energia,
+            'efic':    a.eficiencia_energetica,
+        }
+        for a in top_energia_lista
+    ]
+
+    # Distribuição por zona bioclimática com IDI médio e eficiência média por zona
+    zona_dist = {}
+    for a in agencias:
+        z = a.zona_bioclimatica
+        if z and z in ZONAS_BIOCLIMATICAS:
+            if z not in zona_dist:
+                zona_dist[z] = {
+                    'zona':        z,
+                    'descricao':   ZONAS_BIOCLIMATICAS[z]['descricao'],
+                    'consumo_ref': ZONAS_BIOCLIMATICAS[z]['consumo_ref'],
+                    'total':       0,
+                    'idi_vals':    [],
+                    'efic_vals':   [],
+                }
+            zona_dist[z]['total'] += 1
+            if a.idi is not None:
+                zona_dist[z]['idi_vals'].append(a.idi)
+            # Eficiência mensal: usa campo calculado ou deriva de consumo/área
+            efic_mensal = a.eficiencia_energetica
+            if efic_mensal is None and a.consumo_energia and a.area_util:
+                efic_mensal = round(a.consumo_energia / a.area_util, 2)
+            if efic_mensal is not None:
+                zona_dist[z]['efic_vals'].append(efic_mensal)
+
+    zonas_lista = []
+    for z_num in sorted(zona_dist.keys()):
+        entry = zona_dist[z_num]
+        idi_vals  = entry.pop('idi_vals')
+        efic_vals = entry.pop('efic_vals')
+        entry['idi_medio']  = round(sum(idi_vals)  / len(idi_vals),  2) if idi_vals  else None
+        entry['efic_media'] = round(sum(efic_vals) / len(efic_vals), 2) if efic_vals else None
+        zonas_lista.append(entry)
+
+    sem_zona = sum(1 for a in agencias if not a.zona_bioclimatica)
+
     return {
-        'total':          total,
-        'em_reforma':     em_reforma,
-        'fechadas':       fechadas,
-        'operando':       operando,
-        'limiar_idi':     limiar_idi,
-        'idi_critico':    idi_critico,
-        'idi_medio':      idi_medio,
-        'total_energia':  total_energia,
-        'total_agua':     int(total_agua),
-        'media_efic':     media_efic,
-        'total_residuos': int(total_residuos),
-        'total_colab':    total_colab,
-        'pct_acessivel':  pct_acessivel,
-        'acessiveis':     acessiveis,
-        'vencidas':       vencidas,
-        'sem_vistoria':   sem_vistoria,
-        'segmentos':      segmentos,
-        'bacen_dist':     bacen_dist,
-        'top_criticos':   top_criticos,
-        'ranking_efic':   ranking_efic,
+        'total':              total,
+        'em_reforma':         em_reforma,
+        'fechadas':           fechadas,
+        'operando':           operando,
+        'limiar_idi':         limiar_idi,
+        'idi_critico':        idi_critico,
+        'idi_medio':          idi_medio,
+        'total_energia':      total_energia,
+        'total_agua':         int(total_agua),
+        'media_efic':         media_efic,
+        'total_residuos':     int(total_residuos),
+        'total_colab':        total_colab,
+        'pct_acessivel':      pct_acessivel,
+        'acessiveis':         acessiveis,
+        'vencidas':           vencidas,
+        'sem_vistoria':       sem_vistoria,
+        'segmentos':          segmentos,
+        'bacen_dist':         bacen_dist,
+        'top_criticos':       top_criticos,
+        'idi_critico_lista':  idi_critico_lista,
+        'em_reforma_lista':   em_reforma_lista,
+        'vencidas_lista':     vencidas_lista,
+        'top_energia_lista':  top_energia_lista,
+        'ranking_efic':       ranking_efic,
+        'zonas_lista':        zonas_lista,
+        'sem_zona':           sem_zona,
+    }
+
+
+def get_alerts():
+    """Retorna apenas os dados de alerta necessários para a tela inicial."""
+    agencias = Agencia.query.all()
+    hoje = date.today()
+
+    limiar_cfg = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
+    limiar_idi = float(limiar_cfg.valor) if limiar_cfg else 3.0
+
+    com_idi     = [a for a in agencias if a.idi is not None]
+    idi_critico = sum(1 for a in com_idi if a.idi < limiar_idi)
+
+    com_vistoria = [a for a in agencias if a.vistoria_bombeiros]
+    vencidas = sum(
+        1 for a in com_vistoria
+        if a.vistoria_bombeiros.data_validade and a.vistoria_bombeiros.data_validade < hoje
+    )
+
+    return {
+        'idi_critico': idi_critico,
+        'limiar_idi':  limiar_idi,
+        'vencidas':    vencidas,
     }
 
 
@@ -444,8 +821,8 @@ def logout():
 @login_required
 def index():
     ctx = get_template_context()
-    ctx['page_title'] = 'Página Inicial'
-    ctx['stats']      = get_stats()
+    ctx['page_title'] = 'Início'
+    ctx['alerts']     = get_alerts()
     return render_template('index.html', **ctx)
 
 
@@ -458,14 +835,13 @@ def agencias():
     return render_template('agencias.html', **ctx)
 
 
-@app.route('/detalhes')
+@app.route('/informacoes')
 @login_required
 def detalhes_index():
-    """Redireciona para a primeira agência cadastrada."""
-    ag = Agencia.query.order_by(Agencia.nome).first()
-    if ag:
-        return redirect(url_for('detalhes', prefixo=ag.prefixo))
-    abort(404)
+    """Tela de busca/filtro de agências — Informações das Agências."""
+    ctx = get_template_context()
+    ctx['page_title'] = 'Informações das Agências'
+    return render_template('informacoes.html', **ctx)
 
 
 @app.route('/detalhes/<prefixo>')
@@ -473,7 +849,7 @@ def detalhes_index():
 def detalhes(prefixo):
     agencia = Agencia.query.filter_by(prefixo=prefixo).first_or_404()
     ctx = get_template_context()
-    ctx['page_title']      = f"Agência {prefixo}"
+    ctx['page_title']      = f"Informações — Agência {prefixo}"
     ctx['agencia']         = agencia
     ctx['google_maps_key'] = os.environ.get('GOOGLE_MAPS_API_KEY', '')
     return render_template('detalhes.html', **ctx)
@@ -556,17 +932,15 @@ def api_agencias_criar():
     if cnpj and not validar_cnpj_formato(cnpj):
         return jsonify({'erro': 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX.'}), 400
 
-    # Validate IDI range if provided
-    idi = data.get('idi')
-    if idi is not None and idi != '':
-        try:
-            idi = float(idi)
-            if not validar_idi(idi):
-                return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
-        except (TypeError, ValueError):
-            return jsonify({'erro': 'IDI deve ser um número'}), 400
-    else:
-        idi = None
+    area_util        = float(data['area_util']) if data.get('area_util') not in (None, '') else None
+    consumo_energia  = float(data['consumo_energia']) if data.get('consumo_energia') not in (None, '') else None
+    zona_bioclimatica = int(data['zona_bioclimatica']) if data.get('zona_bioclimatica') not in (None, '') else None
+
+    if zona_bioclimatica is not None and zona_bioclimatica not in ZONAS_BIOCLIMATICAS:
+        return jsonify({'erro': 'Zona bioclimática inválida. Use um valor entre 1 e 8.'}), 400
+
+    eficiencia_energetica = calcular_eficiencia_energetica(consumo_energia, area_util)
+    idi = calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica)
 
     ag = Agencia(
         prefixo=prefixo, nome=nome, municipio=municipio, uf=uf,
@@ -576,14 +950,15 @@ def api_agencias_criar():
         segmento=data.get('segmento', 'Varejo'),
         status=data.get('status', 'Operação Normal'),
         lat=data.get('lat') or None, lng=data.get('lng') or None,
-        consumo_energia=data.get('consumo_energia') or None,
-        consumo_agua=data.get('consumo_agua') or None,
+        consumo_energia=consumo_energia,
+        consumo_agua=float(data['consumo_agua']) if data.get('consumo_agua') not in (None, '') else None,
         acessibilidade=bool(data.get('acessibilidade', True)),
         email_agencia=data.get('email_agencia') or None,
         cnpj=cnpj or None,
-        area_util=float(data['area_util']) if data.get('area_util') not in (None, '') else None,
+        area_util=area_util,
+        zona_bioclimatica=zona_bioclimatica,
         idi=idi,
-        eficiencia_energetica=float(data['eficiencia_energetica']) if data.get('eficiencia_energetica') not in (None, '') else None,
+        eficiencia_energetica=eficiencia_energetica,
         residuos_solidos=float(data['residuos_solidos']) if data.get('residuos_solidos') not in (None, '') else None,
         num_colaboradores=int(data['num_colaboradores']) if data.get('num_colaboradores') not in (None, '') else None,
         classificacao_bacen=data.get('classificacao_bacen') or None,
@@ -628,25 +1003,27 @@ def api_agencias_editar(agencia_id):
         ag.cnpj = cnpj
     if 'area_util' in data:
         ag.area_util = float(data['area_util']) if data['area_util'] not in (None, '') else None
-    if 'idi' in data:
-        if data['idi'] not in (None, ''):
+    if 'zona_bioclimatica' in data:
+        if data['zona_bioclimatica'] not in (None, ''):
             try:
-                idi_val = float(data['idi'])
-                if not validar_idi(idi_val):
-                    return jsonify({'erro': 'O IDI deve estar entre 1,0 e 10,0.'}), 400
-                ag.idi = idi_val
+                zb = int(data['zona_bioclimatica'])
+                if zb not in ZONAS_BIOCLIMATICAS:
+                    return jsonify({'erro': 'Zona bioclimática inválida. Use um valor entre 1 e 8.'}), 400
+                ag.zona_bioclimatica = zb
             except (TypeError, ValueError):
-                return jsonify({'erro': 'IDI deve ser um número'}), 400
+                return jsonify({'erro': 'Zona bioclimática deve ser um número inteiro entre 1 e 8.'}), 400
         else:
-            ag.idi = None
-    if 'eficiencia_energetica' in data:
-        ag.eficiencia_energetica = float(data['eficiencia_energetica']) if data['eficiencia_energetica'] not in (None, '') else None
+            ag.zona_bioclimatica = None
     if 'residuos_solidos' in data:
         ag.residuos_solidos = float(data['residuos_solidos']) if data['residuos_solidos'] not in (None, '') else None
     if 'num_colaboradores' in data:
         ag.num_colaboradores = int(data['num_colaboradores']) if data['num_colaboradores'] not in (None, '') else None
     if 'classificacao_bacen' in data:
         ag.classificacao_bacen = str(data['classificacao_bacen']).strip() or None
+
+    # Recalcula eficiência energética e IDI automaticamente pela zona bioclimática
+    ag.eficiencia_energetica = calcular_eficiencia_energetica(ag.consumo_energia, ag.area_util)
+    ag.idi = calcular_idi_por_zona(ag.consumo_energia, ag.area_util, ag.zona_bioclimatica)
 
     ag.atualizado_em = datetime.utcnow()
     db.session.commit()
@@ -660,6 +1037,23 @@ def api_agencias_deletar(agencia_id):
     db.session.delete(ag)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@app.route('/api/admin/recalcular-eficiencia', methods=['POST'])
+@gestao_required
+def api_recalcular_eficiencia():
+    """Recalcula eficiência energética e IDI de todas as agências com os dados disponíveis."""
+    agencias = Agencia.query.all()
+    atualizadas = 0
+    for ag in agencias:
+        nova_efic = calcular_eficiencia_energetica(ag.consumo_energia, ag.area_util)
+        novo_idi  = calcular_idi_por_zona(ag.consumo_energia, ag.area_util, ag.zona_bioclimatica)
+        if nova_efic != ag.eficiencia_energetica or novo_idi != ag.idi:
+            ag.eficiencia_energetica = nova_efic
+            ag.idi = novo_idi
+            atualizadas += 1
+    db.session.commit()
+    return jsonify({'ok': True, 'atualizadas': atualizadas})
 
 
 @app.route('/api/agencias/<int:agencia_id>/dwg', methods=['GET'])
@@ -991,6 +1385,17 @@ def api_config_limiar_idi_get():
     return jsonify({'limiar_idi': limiar})
 
 
+@app.route('/api/config/zonas-bioclimaticas', methods=['GET'])
+@login_required
+def api_zonas_bioclimaticas():
+    """Retorna a lista de zonas bioclimáticas com descrição e consumo de referência."""
+    zonas = [
+        {'zona': k, 'descricao': v['descricao'], 'consumo_ref': v['consumo_ref']}
+        for k, v in ZONAS_BIOCLIMATICAS.items()
+    ]
+    return jsonify(zonas)
+
+
 @app.route('/api/config/limiar-idi', methods=['PUT'])
 @gestao_required
 def api_config_limiar_idi_put():
@@ -1003,8 +1408,8 @@ def api_config_limiar_idi_put():
     except (TypeError, ValueError):
         return jsonify({'erro': 'O limiar deve ser um número'}), 400
 
-    if not (1.0 <= limiar <= 9.9):
-        return jsonify({'erro': 'O limiar deve estar entre 1,0 e 9,9.'}), 400
+    if not (0.1 <= limiar <= 5.0):
+        return jsonify({'erro': 'O limiar deve estar entre 0,1 e 5,0.'}), 400
 
     config = ConfiguracaoSistema.query.filter_by(chave='limiar_idi').first()
     if config:
@@ -1048,6 +1453,10 @@ def api_usuarios_criar():
     u.set_senha(senha)
     db.session.add(u)
     db.session.commit()
+
+    # Envia e-mail com as credenciais de acesso
+    email_boas_vindas(u, senha)
+
     return jsonify(u.to_dict()), 201
 
 
@@ -1087,6 +1496,158 @@ def api_usuarios_deletar(usuario_id):
     db.session.delete(u)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+# ── Solicitação de acesso ──────────────────────────────────────────────────────
+
+@app.route('/solicitar-acesso', methods=['GET', 'POST'])
+def solicitar_acesso():
+    if request.method == 'POST':
+        nome          = request.form.get('nome', '').strip()
+        email         = request.form.get('email', '').strip().lower()
+        justificativa = request.form.get('justificativa', '').strip()
+
+        if not nome or not email:
+            return render_template('solicitar_acesso.html', erro='Nome e e-mail são obrigatórios.')
+
+        # Bloqueia se já existe usuário ativo com esse e-mail
+        if Usuario.query.filter_by(email=email, ativo=True).first():
+            return render_template('solicitar_acesso.html',
+                                   erro='Este e-mail já possui acesso ao sistema.')
+
+        # Bloqueia solicitação pendente duplicada
+        pendente = SolicitacaoAcesso.query.filter_by(email=email, status='pendente').first()
+        if pendente:
+            return render_template('solicitar_acesso.html',
+                                   erro='Já existe uma solicitação pendente para este e-mail.')
+
+        sol = SolicitacaoAcesso(nome=nome, email=email, justificativa=justificativa)
+        db.session.add(sol)
+        db.session.commit()
+
+        email_solicitacao_admin(sol)
+
+        return render_template('solicitar_acesso.html', sucesso=True)
+
+    return render_template('solicitar_acesso.html')
+
+
+@app.route('/definir-senha/<token>', methods=['GET', 'POST'])
+def definir_senha(token):
+    sol = SolicitacaoAcesso.query.filter_by(token=token, status='aprovado').first()
+
+    if not sol:
+        return render_template('definir_senha.html', erro='Link inválido ou já utilizado.')
+
+    if sol.token_expira and datetime.utcnow() > sol.token_expira:
+        return render_template('definir_senha.html', erro='Este link expirou. Solicite um novo acesso.')
+
+    if request.method == 'POST':
+        senha   = request.form.get('senha', '')
+        confirma = request.form.get('confirma', '')
+
+        if len(senha) < 6:
+            return render_template('definir_senha.html', token=token,
+                                   erro='A senha deve ter pelo menos 6 caracteres.')
+        if senha != confirma:
+            return render_template('definir_senha.html', token=token,
+                                   erro='As senhas não coincidem.')
+
+        # Cria o usuário
+        username = sol.email.split('@')[0].replace('.', '_').lower()
+        # Garante username único
+        base = username
+        contador = 1
+        while Usuario.query.filter_by(username=username).first():
+            username = f"{base}{contador}"
+            contador += 1
+
+        u = Usuario(username=username, nome=sol.nome, email=sol.email,
+                    nivel='Consulta', ativo=True)
+        u.set_senha(senha)
+        db.session.add(u)
+
+        # Invalida o token
+        sol.token = None
+        sol.token_expira = None
+        db.session.commit()
+
+        return render_template('definir_senha.html', concluido=True, username=username)
+
+    return render_template('definir_senha.html', token=token, nome=sol.nome)
+
+
+# ── APIs de solicitações (admin) ───────────────────────────────────────────────
+
+@app.route('/api/solicitacoes')
+@gestao_required
+def api_solicitacoes_listar():
+    status = request.args.get('status', '')
+    query  = SolicitacaoAcesso.query
+    if status:
+        query = query.filter_by(status=status)
+    sols = query.order_by(SolicitacaoAcesso.criado_em.desc()).all()
+    return jsonify([s.to_dict() for s in sols])
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/aprovar', methods=['POST'])
+@gestao_required
+def api_solicitacao_aprovar(sol_id):
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status != 'pendente':
+        return jsonify({'erro': 'Solicitação já foi processada.'}), 400
+
+    # Gera token seguro
+    token = uuid.uuid4().hex + uuid.uuid4().hex  # 64 chars
+    sol.status       = 'aprovado'
+    sol.token        = token
+    sol.token_expira = datetime.utcnow() + timedelta(hours=24)
+    sol.resolvido_em = datetime.utcnow()
+    db.session.commit()
+
+    link         = f"{_base_url()}/definir-senha/{token}"
+    email_ok     = email_aprovacao(sol, link)
+
+    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok})
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/rejeitar', methods=['POST'])
+@gestao_required
+def api_solicitacao_rejeitar(sol_id):
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status != 'pendente':
+        return jsonify({'erro': 'Solicitação já foi processada.'}), 400
+
+    sol.status       = 'rejeitado'
+    sol.resolvido_em = datetime.utcnow()
+    db.session.commit()
+
+    email_rejeicao(sol)
+
+    return jsonify({'ok': True})
+
+
+@app.route('/api/solicitacoes/<int:sol_id>/reenviar', methods=['POST'])
+@gestao_required
+def api_solicitacao_reenviar(sol_id):
+    """Gera novo token e reenvia o e-mail de aprovação (útil quando o link expirou)."""
+    sol = SolicitacaoAcesso.query.get_or_404(sol_id)
+
+    if sol.status not in ('aprovado',):
+        return jsonify({'erro': 'Só é possível reenviar para solicitações aprovadas.'}), 400
+
+    # Gera novo token
+    token = uuid.uuid4().hex + uuid.uuid4().hex
+    sol.token        = token
+    sol.token_expira = datetime.utcnow() + timedelta(hours=24)
+    db.session.commit()
+
+    link         = f"{_base_url()}/definir-senha/{token}"
+    email_ok     = email_aprovacao(sol, link)
+
+    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok})
 
 
 @app.errorhandler(403)
