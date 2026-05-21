@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Consulta de Agências | Portal DISEC{% endblock %}
+{% block page_name %}Consulta Nacional de Agências{% endblock %}
+
+{% block content %}
+<div class="agencias-wrapper">
+
+    <aside class="filters-panel" id="filters-panel">
+        <h3 class="filter-panel-title">Filtros Avançados</h3>
+
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-map-marker-alt"></i> Região</label>
+            <select class="filter-select" id="filter-regiao" onchange="updateStates()">
+                <option value="">Todas as Regiões</option>
+                <option value="Norte">Norte</option>
+                <option value="Nordeste">Nordeste</option>
+                <option value="Centro-Oeste">Centro-Oeste</option>
+                <option value="Sudeste">Sudeste</option>
+                <option value="Sul">Sul</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-city"></i> Estado</label>
+            <select class="filter-select" id="filter-estado" disabled>
+                <option value="">Selecione a Região</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-layer-group"></i> Segmento / Tipo</label>
+            <div class="check-list">
+                <label class="check-item">
+                    <input type="checkbox" value="Varejo" checked>
+                    <span class="check-box accent-blue"></span> Varejo (PF)
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Empresa" checked>
+                    <span class="check-box accent-black"></span> Empresa (PJ)
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Agronegócio" checked>
+                    <span class="check-box accent-green"></span> Agronegócio
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Estilo" checked>
+                    <span class="check-box accent-purple"></span> Estilo / Alta Renda
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Governo" checked>
+                    <span class="check-box accent-info"></span> Governo
+                </label>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-tools"></i> Status Infra</label>
+            <div class="check-list">
+                <label class="check-item">
+                    <input type="checkbox" value="Operação Normal" checked>
+                    <span class="check-box accent-info"></span> Operação Normal
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Em Reforma" checked>
+                    <span class="check-box accent-yellow"></span> Em Reforma
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" value="Fechada" checked>
+                    <span class="check-box accent-red"></span> Fechada
+                </label>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-university"></i> Classificação BACEN</label>
+            <select class="filter-select" id="filter-classificacao-bacen">
+                <option value="">Todas</option>
+                <option value="Agência">Agência</option>
+                <option value="Posto de Atendimento Bancário (PAB)">Posto de Atendimento Bancário (PAB)</option>
+                <option value="Posto de Atendimento Eletrônico (PAE)">Posto de Atendimento Eletrônico (PAE)</option>
+                <option value="Unidade de Atendimento Bancário (UAB)">Unidade de Atendimento Bancário (UAB)</option>
+                <option value="Correspondente Bancário">Correspondente Bancário</option>
+            </select>
+        </div>
+
+        <button class="btn-apply-filters" id="btn-aplicar-filtros" onclick="buscarAgencias()">
+            <i class="fas fa-filter"></i> Aplicar Filtros
+        </button>
+    </aside>
+
+    <button class="panel-toggle-btn" id="toggle-filters" title="Recolher filtros" aria-label="Recolher filtros">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+
+    <section class="results-area">
+        <div class="floating-search">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" placeholder="Pesquisar por nome, prefixo ou cidade...">
+                <button class="btn-search" id="searchBtn" onclick="buscarAgencias()">Buscar</button>
+            </div>
+        </div>
+
+        <div class="view-toggle">
+            <button class="active" id="btn-map" onclick="switchView('map')">
+                <i class="fas fa-map"></i> Mapa
+            </button>
+            <button id="btn-list" onclick="switchView('list')">
+                <i class="fas fa-list"></i> Lista
+            </button>
+        </div>
+
+        <div id="resultado-count" style="padding:8px 16px;font-size:.85rem;color:var(--text-muted);"></div>
+
+        <div id="map-view" class="view-container" style="position:relative;">
+            <div id="google-map-agencias" style="width:100%;height:100%;"></div>
+            <div id="map-legend" style="
+                position:absolute;
+                bottom:32px;
+                right:12px;
+                background:rgba(255,255,255,0.95);
+                border:1px solid #d1d5db;
+                border-radius:8px;
+                padding:10px 14px;
+                font-size:.8rem;
+                line-height:1.8;
+                box-shadow:0 2px 8px rgba(0,0,0,.15);
+                z-index:10;
+                pointer-events:none;
+            ">
+                <div style="font-weight:600;margin-bottom:4px;">Legenda — IDI</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#0038A8;margin-right:6px;vertical-align:middle;"></span>IDI ≥ Limiar (Normal)</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#E11D48;margin-right:6px;vertical-align:middle;"></span>IDI &lt; Limiar (Crítico)</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#6B7280;margin-right:6px;vertical-align:middle;"></span>IDI não informado</div>
+            </div>
+        </div>
+
+        <div id="list-view" class="view-container" style="display:none;">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prefixo</th>
+                            <th>Nome da Unidade</th>
+                            <th>Cidade / UF</th>
+                            <th>Segmento</th>
+                            <th>Classificação BACEN</th>
+                            <th>Status</th>
+                            <th style="text-align:center;">Efic. Energética</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let gMap;
+    let gMarkers = [];
+    let gLimiarIDI = 3.0;
+
+    const estadosPorRegiao = {
+        'Norte':        ['AC','AM','AP','PA','RO','RR','TO'],
+        'Nordeste':     ['AL','BA','CE','MA','PB','PE','PI','RN','SE'],
+        'Centro-Oeste': ['DF','GO','MT','MS'],
+        'Sudeste':      ['ES','MG','RJ','SP'],
+        'Sul':          ['PR','RS','SC']
+    };
+
+    // ── Lê parâmetro de filtro rápido vindo do dashboard ──────────────────
+    function aplicarFiltroRapido() {
+        const params = new URLSearchParams(window.location.search);
+        const filtro = params.get('filter');
+        if (!filtro) return;
+
+        const statusCbs = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+            .filter(cb => ['Operação Normal','Em Reforma','Fechada'].includes(cb.value));
+
+        if (filtro === 'todas') {
+            statusCbs.forEach(cb => cb.checked = true);
+        } else if (filtro === 'operando') {
+            statusCbs.forEach(cb => { cb.checked = cb.value === 'Operação Normal'; });
+        } else if (filtro === 'idi_critico') {
+            statusCbs.forEach(cb => cb.checked = true);
+            window._filtroIDICritico = true;
+        }
+    }
+
+    // ── Callback do Google Maps — ponto único de entrada ──────────────────
+    async function initMap() {
+        gMap = new google.maps.Map(document.getElementById('google-map-agencias'), {
+            center: { lat: -14.235, lng: -51.925 },
+            zoom: 4,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true
+        });
+
+        // Busca o limiar IDI configurado
+        try {
+            const res  = await fetch('/api/config/limiar-idi');
+            const data = await res.json();
+            if (data && data.limiar_idi != null) {
+                gLimiarIDI = parseFloat(data.limiar_idi);
+            }
+        } catch (e) { /* usa padrão 3.0 */ }
+
+        aplicarFiltroRapido();
+        buscarAgencias();
+    }
+
+    // ── Marcadores ────────────────────────────────────────────────────────
+    function limparMarcadores() {
+        gMarkers.forEach(m => m.setMap(null));
+        gMarkers = [];
+    }
+
+    function corPorIDI(idi, limiar) {
+        if (idi == null) return '#6B7280';
+        return idi >= limiar ? '#0038A8' : '#E11D48';
+    }
+
+    function atualizarLimiarIDI(novoLimiar) {
+        gLimiarIDI = parseFloat(novoLimiar);
+        gMarkers.forEach(m => {
+            m.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 9,
+                fillColor: corPorIDI(m._idi, gLimiarIDI),
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+            });
+        });
+    }
+
+    function adicionarMarcador(ag) {
+        if (!ag.lat || !ag.lng) return;
+
+        const marker = new google.maps.Marker({
+            position: { lat: ag.lat, lng: ag.lng },
+            map: gMap,
+            title: ag.nome,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 9,
+                fillColor: corPorIDI(ag.idi, gLimiarIDI),
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+            }
+        });
+
+        marker._idi = ag.idi != null ? ag.idi : null;
+
+        const idiTexto = ag.idi != null ? `IDI: ${ag.idi}` : 'IDI não informado';
+        const infoWindow = new google.maps.InfoWindow({
+            content: `<div style="font-size:.9rem;line-height:1.5;">
+                <strong>${ag.nome}</strong><br>
+                Prefixo: ${ag.prefixo}<br>
+                ${idiTexto}
+            </div>`
+        });
+
+        marker.addListener('mouseover', () => infoWindow.open(gMap, marker));
+        marker.addListener('mouseout',  () => infoWindow.close());
+        marker.addListener('click',     () => { window.location.href = '/detalhes/' + ag.prefixo; });
+
+        gMarkers.push(marker);
+    }
+
+    // ── Busca e renderização ──────────────────────────────────────────────
+    async function buscarAgencias() {
+        const q                  = document.getElementById('search-input').value.trim();
+        const uf                 = document.getElementById('filter-estado').value;
+        const classificacaoBacen = document.getElementById('filter-classificacao-bacen').value;
+
+        const params = new URLSearchParams();
+        if (q)                  params.append('q', q);
+        if (uf)                 params.append('uf', uf);
+        if (classificacaoBacen) params.append('classificacao_bacen', classificacaoBacen);
+
+        let agencias;
+        try {
+            const res = await fetch('/api/agencias?' + params.toString());
+            agencias  = await res.json();
+        } catch (err) {
+            document.getElementById('resultado-count').textContent = 'Erro ao carregar agências.';
+            return;
+        }
+
+        // Filtros client-side: segmento
+        const segsSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+            .filter(cb => cb.checked && ['Varejo','Empresa','Agronegócio','Estilo','Governo'].includes(cb.value))
+            .map(cb => cb.value);
+        if (segsSel.length < 5)
+            agencias = agencias.filter(ag => !ag.segmento || segsSel.includes(ag.segmento));
+
+        // Filtros client-side: status
+        const statusSel = [...document.querySelectorAll('.check-list input[type=checkbox]')]
+            .filter(cb => cb.checked && ['Operação Normal','Em Reforma','Fechada'].includes(cb.value))
+            .map(cb => cb.value);
+        if (statusSel.length < 3)
+            agencias = agencias.filter(ag => !ag.status || statusSel.includes(ag.status));
+
+        // Filtro especial: IDI crítico (vindo do dashboard)
+        if (window._filtroIDICritico)
+            agencias = agencias.filter(ag => ag.idi != null && ag.idi < gLimiarIDI);
+
+        renderTabela(agencias);
+        renderMapa(agencias);
+
+        document.getElementById('resultado-count').textContent =
+            `${agencias.length} agência(s) encontrada(s)`;
+    }
+
+    function renderTabela(agencias) {
+        const tbody = document.getElementById('table-body');
+        if (!agencias.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhuma agência encontrada.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = agencias.map(ag => {
+            // Calcula eficiência anual e verifica limite da zona
+            let eficBadge = '<span style="color:var(--text-muted);font-size:.8rem;">—</span>';
+            if (ag.eficiencia_energetica != null || (ag.consumo_energia && ag.area_util)) {
+                const eficMensal = ag.eficiencia_energetica != null
+                    ? ag.eficiencia_energetica
+                    : Math.round((ag.consumo_energia / ag.area_util) * 100) / 100;
+                const eficAnual = Math.round(eficMensal * 12 * 10) / 10;
+                const limiteZona = ag.zona_bioclimatica_consumo_ref;
+                if (limiteZona != null) {
+                    const acima = eficAnual > limiteZona;
+                    const pct   = Math.round((eficAnual - limiteZona) / limiteZona * 1000) / 10;
+                    eficBadge = acima
+                        ? `<span style="display:inline-flex;align-items:center;gap:4px;
+                                        background:#fee2e2;color:#991b1b;font-weight:700;font-size:.78rem;
+                                        padding:2px 8px;border-radius:10px;"
+                                 title="Eficiência anual: ${eficAnual} kWh/m²·ano — Limite Zona ${ag.zona_bioclimatica}: ${limiteZona} kWh/m²·ano">
+                               <i class="fas fa-exclamation-triangle"></i> ${eficAnual} (+${pct}%)
+                           </span>`
+                        : `<span style="display:inline-flex;align-items:center;gap:4px;
+                                        background:#dcfce7;color:#166534;font-weight:600;font-size:.78rem;
+                                        padding:2px 8px;border-radius:10px;"
+                                 title="Eficiência anual: ${eficAnual} kWh/m²·ano — Limite Zona ${ag.zona_bioclimatica}: ${limiteZona} kWh/m²·ano">
+                               <i class="fas fa-check"></i> ${eficAnual}
+                           </span>`;
+                } else {
+                    eficBadge = `<span style="font-size:.8rem;color:var(--text-muted);">${eficAnual} kWh/m²·ano</span>`;
+                }
+            }
+            return `
+            <tr>
+                <td class="fw-bold">${ag.prefixo}</td>
+                <td>${ag.nome}</td>
+                <td class="text-muted">${ag.municipio} / ${ag.uf}</td>
+                <td>${ag.segmento || '-'}</td>
+                <td>${ag.classificacao_bacen || 'Não classificada'}</td>
+                <td><span class="badge ${badgeStatus(ag.status)}">${ag.status || '-'}</span></td>
+                <td style="text-align:center;">${eficBadge}</td>
+                <td>
+                    <a href="/detalhes/${ag.prefixo}" class="btn btn-primary"
+                       style="padding:6px 14px;font-size:.8rem;">
+                        <i class="fas fa-eye"></i> Detalhes
+                    </a>
+                </td>
+            </tr>
+        `}).join('');
+    }
+
+    function renderMapa(agencias) {
+        if (!gMap) return;
+        limparMarcadores();
+        agencias.forEach(ag => adicionarMarcador(ag));
+
+        if (gMarkers.length > 0) {
+            const bounds = new google.maps.LatLngBounds();
+            gMarkers.forEach(m => bounds.extend(m.getPosition()));
+            gMap.fitBounds(bounds, { padding: 60 });
+            const listener = google.maps.event.addListener(gMap, 'idle', () => {
+                if (gMap.getZoom() > 14) gMap.setZoom(14);
+                google.maps.event.removeListener(listener);
+            });
+        }
+    }
+
+    function badgeStatus(status) {
+        if (status === 'Operação Normal') return 'badge-ok';
+        if (status === 'Em Reforma')      return 'badge-reforma';
+        if (status === 'Fechada')         return 'badge-inativo';
+        return 'badge-consulta';
+    }
+
+    // ── Filtro de estados por região ──────────────────────────────────────
+    function updateStates() {
+        const regiao = document.getElementById('filter-regiao').value;
+        const sel    = document.getElementById('filter-estado');
+        if (regiao && estadosPorRegiao[regiao]) {
+            sel.disabled = false;
+            sel.innerHTML = '<option value="">Todos os Estados</option>';
+            estadosPorRegiao[regiao].forEach(uf => {
+                const opt = document.createElement('option');
+                opt.value = uf; opt.text = uf;
+                sel.appendChild(opt);
+            });
+        } else {
+            sel.disabled = true;
+            sel.innerHTML = '<option value="">Selecione a Região</option>';
+        }
+    }
+
+    // ── Painel de filtros ─────────────────────────────────────────────────
+    const filtersPanel = document.getElementById('filters-panel');
+    const toggleBtn    = document.getElementById('toggle-filters');
+    const toggleIcon   = toggleBtn.querySelector('i');
+
+    toggleBtn.addEventListener('click', () => {
+        filtersPanel.classList.toggle('collapsed');
+        toggleBtn.classList.toggle('collapsed');
+        toggleIcon.classList.toggle('fa-chevron-left');
+        toggleIcon.classList.toggle('fa-chevron-right');
+        setTimeout(() => { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 320);
+    });
+
+    // ── Alternar mapa / lista ─────────────────────────────────────────────
+    function switchView(view) {
+        document.getElementById('map-view').style.display  = view === 'map'  ? 'block' : 'none';
+        document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
+        document.getElementById('btn-map').classList.toggle('active',  view === 'map');
+        document.getElementById('btn-list').classList.toggle('active', view === 'list');
+        if (view === 'map' && gMap)
+            setTimeout(() => google.maps.event.trigger(gMap, 'resize'), 50);
+    }
+
+    document.getElementById('search-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') buscarAgencias();
+    });
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMap&loading=async" async defer></script>
+{% endblock %}

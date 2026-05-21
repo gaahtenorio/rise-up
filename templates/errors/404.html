@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Página não encontrada | Portal DISEC{% endblock %}
+
+{% block content %}
+<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; text-align:center; gap:16px;">
+    <i class="fas fa-search" style="font-size:4rem; color:#0038A8; opacity:0.4;"></i>
+    <h1 style="font-size:2rem; color:#0038A8;">Página não encontrada</h1>
+    <p style="color:#666; max-width:400px;">O recurso que você está procurando não existe ou foi movido.</p>
+    <a href="{{ url_for('index') }}" style="margin-top:8px; padding:12px 28px; background:#0038A8; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">
+        <i class="fas fa-home"></i> Voltar ao Início
+    </a>
+</div>
+{% endblock %}

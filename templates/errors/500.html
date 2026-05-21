@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Erro interno | Portal DISEC{% endblock %}
+
+{% block content %}
+<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; text-align:center; gap:16px;">
+    <i class="fas fa-exclamation-triangle" style="font-size:4rem; color:#e74c3c; opacity:0.6;"></i>
+    <h1 style="font-size:2rem; color:#0038A8;">Erro interno do servidor</h1>
+    <p style="color:#666; max-width:400px;">Algo deu errado no servidor. Nossa equipe foi notificada. Tente novamente em alguns instantes.</p>
+    <a href="{{ url_for('index') }}" style="margin-top:8px; padding:12px 28px; background:#0038A8; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">
+        <i class="fas fa-home"></i> Voltar ao Início
+    </a>
+</div>
+{% endblock %}

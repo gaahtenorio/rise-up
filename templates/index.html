@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% block title %}Início | Portal DISEC{% endblock %}
+
+{% block content %}
+
+{# ── Hero ─────────────────────────────────────────────────────────────── #}
+<div class="welcome-hero">
+    <div class="welcome-hero-text">
+        <p class="welcome-greeting">Olá, {{ user_name }} 👋</p>
+        <h1>Bem-vindo ao <span>Portal DISEC</span></h1>
+        <p class="welcome-sub">
+            Plataforma de gestão de infraestrutura, conformidade e sustentabilidade
+            da rede de agências do Banco do Brasil.
+        </p>
+        <a href="{{ url_for('dashboard') }}" class="hero-cta">
+            <i class="fas fa-chart-line"></i> Acessar Dashboard
+        </a>
+    </div>
+    <div class="welcome-hero-badge">
+        <img src="{{ url_for('static', filename='assets/img/bb-logo.png') }}" alt="BB" class="hero-logo">
+    </div>
+</div>
+
+{# ── Faixa de alertas (só aparece se houver pendências) ───────────────── #}
+{% if alerts.idi_critico > 0 or alerts.vencidas > 0 %}
+<div class="alert-strip">
+    <div class="alert-strip-icon"><i class="fas fa-bell"></i></div>
+    <div class="alert-strip-body">
+        <span class="alert-strip-title">Há pendências que requerem atenção</span>
+        <div class="alert-strip-items">
+            {% if alerts.idi_critico > 0 %}
+            <a href="{{ url_for('agencias') }}?filter=idi_critico" class="alert-chip alert-chip-red">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ alerts.idi_critico }} agência(s) com IDI crítico
+            </a>
+            {% endif %}
+            {% if alerts.vencidas > 0 %}
+            <a href="{{ url_for('dashboard') }}#vistorias-vencidas" class="alert-chip alert-chip-orange">
+                <i class="fas fa-fire-extinguisher"></i>
+                {{ alerts.vencidas }} vistoria(s) vencida(s)
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ── Cards de navegação ───────────────────────────────────────────────── #}
+<h2 class="section-label">Acesso rápido</h2>
+
+<div class="home-nav-grid">
+
+    <a href="{{ url_for('dashboard') }}" class="home-nav-card">
+        <div class="hnc-icon hnc-blue"><i class="fas fa-chart-line"></i></div>
+        <div class="hnc-body">
+            <h3>Dashboard Estratégico</h3>
+            <p>Indicadores consolidados de infraestrutura, ESG, IDI, vistorias e distribuição geográfica.</p>
+        </div>
+        <div class="hnc-footer">Ver Dashboard <i class="fas fa-arrow-right"></i></div>
+    </a>
+
+    <a href="{{ url_for('agencias') }}" class="home-nav-card">
+        <div class="hnc-icon hnc-green"><i class="fas fa-map-marked-alt"></i></div>
+        <div class="hnc-body">
+            <h3>Localizador de Agências</h3>
+            <p>Visualize todas as unidades no mapa, filtre por região, segmento, status ou IDI.</p>
+        </div>
+        <div class="hnc-footer">Acessar Mapa <i class="fas fa-arrow-right"></i></div>
+    </a>
+
+    <a href="{{ url_for('detalhes_index') }}" class="home-nav-card">
+        <div class="hnc-icon hnc-purple"><i class="fas fa-info-circle"></i></div>
+        <div class="hnc-body">
+            <h3>Informações das Agências</h3>
+            <p>Dados completos de cada unidade: IDI, ESG, horários SAA, arquivos DWG e laudo de bombeiros.</p>
+        </div>
+        <div class="hnc-footer">Ver Informações <i class="fas fa-arrow-right"></i></div>
+    </a>
+
+    {% if user_level == 'Gestão' %}
+    <a href="{{ url_for('admin') }}" class="home-nav-card home-nav-card-admin">
+        <div class="hnc-icon hnc-yellow"><i class="fas fa-user-shield"></i></div>
+        <div class="hnc-body">
+            <h3>Gestão de Dados</h3>
+            <p>Cadastre, edite ou remova agências e usuários da base central DISEC.</p>
+        </div>
+        <div class="hnc-footer">Gerenciar Base <i class="fas fa-arrow-right"></i></div>
+    </a>
+    {% endif %}
+
+</div>
+
+{# ── Sobre o sistema ──────────────────────────────────────────────────── #}
+<div class="about-strip">
+    <div class="about-item">
+        <i class="fas fa-landmark"></i>
+        <span>Gestão de infraestrutura física da rede BB</span>
+    </div>
+    <div class="about-sep"></div>
+    <div class="about-item">
+        <i class="fas fa-leaf"></i>
+        <span>Monitoramento ESG — energia, água e resíduos</span>
+    </div>
+    <div class="about-sep"></div>
+    <div class="about-item">
+        <i class="fas fa-shield-alt"></i>
+        <span>Conformidade e segurança contra incêndio</span>
+    </div>
+    <div class="about-sep"></div>
+    <div class="about-item">
+        <i class="fas fa-map-marked-alt"></i>
+        <span>Visualização geográfica nacional</span>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+.welcome-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    background: linear-gradient(135deg, var(--bb-blue) 0%, #1a4fc4 100%);
+    border-radius: var(--radius-lg);
+    padding: 48px 52px;
+    margin-bottom: 24px;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+}
+.welcome-hero::before {
+    content: '';
+    position: absolute;
+    right: -60px; top: -60px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    pointer-events: none;
+}
+.welcome-hero::after {
+    content: '';
+    position: absolute;
+    right: 100px; bottom: -90px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    pointer-events: none;
+}
+.welcome-greeting {
+    font-size: .95rem;
+    font-weight: 600;
+    opacity: .8;
+    margin-bottom: 10px;
+}
+.welcome-hero-text h1 {
+    font-size: 2.1rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 14px;
+    line-height: 1.2;
+}
+.welcome-hero-text h1 span { color: var(--bb-yellow); }
+.welcome-sub {
+    font-size: .93rem;
+    opacity: .82;
+    max-width: 500px;
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+.hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bb-yellow);
+    color: var(--bb-blue);
+    font-weight: 800;
+    font-size: .88rem;
+    padding: 11px 24px;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: filter .18s, transform .18s;
+    position: relative;
+    z-index: 1;
+}
+.hero-cta:hover { filter: brightness(.93); transform: translateY(-2px); }
+.hero-logo {
+    width: 88px;
+    opacity: .9;
+    filter: brightness(0) invert(1);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Alert strip ───────────────────────────────────────────────────────── */
+.alert-strip {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #fff8f0;
+    border: 1px solid #fed7aa;
+    border-left: 4px solid #f97316;
+    border-radius: var(--radius-md);
+    padding: 14px 20px;
+    margin-bottom: 28px;
+}
+.alert-strip-icon { font-size: 1.2rem; color: #f97316; flex-shrink: 0; }
+.alert-strip-title {
+    font-size: .82rem;
+    font-weight: 700;
+    color: #9a3412;
+    display: block;
+    margin-bottom: 8px;
+}
+.alert-strip-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.alert-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 50px;
+    font-size: .78rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: filter .15s, transform .15s;
+}
+.alert-chip:hover { filter: brightness(.92); transform: translateY(-1px); }
+.alert-chip-red    { background: #fee2e2; color: #991b1b; }
+.alert-chip-orange { background: #ffedd5; color: #9a3412; }
+
+/* ── Section label ─────────────────────────────────────────────────────── */
+.section-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+/* ── Nav cards ─────────────────────────────────────────────────────────── */
+.home-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+.home-nav-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+}
+.home-nav-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--bb-blue);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .25s ease;
+}
+.home-nav-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+.home-nav-card:hover::after { transform: scaleX(1); }
+.home-nav-card-admin::after { background: var(--bb-yellow); }
+
+.hnc-icon {
+    width: 52px; height: 52px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.hnc-blue   { background: #eef2ff; color: var(--bb-blue); }
+.hnc-green  { background: #f0fdf4; color: #16a34a; }
+.hnc-purple { background: #f5f3ff; color: #7c3aed; }
+.hnc-yellow { background: #fefce8; color: #ca8a04; }
+
+.hnc-body { flex: 1; }
+.hnc-body h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--bb-blue);
+    margin-bottom: 6px;
+}
+.hnc-body p {
+    font-size: .83rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+.hnc-footer {
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--bb-blue);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: .65;
+    transition: opacity .2s, gap .2s;
+}
+.home-nav-card:hover .hnc-footer { opacity: 1; gap: 10px; }
+
+/* ── About strip ───────────────────────────────────────────────────────── */
+.about-strip {
+    background: var(--white);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(0,0,0,0.04);
+    display: flex;
+    align-items: center;
+    padding: 20px 32px;
+    gap: 0;
+    flex-wrap: wrap;
+}
+.about-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 180px;
+    padding: 8px 16px;
+    font-size: .82rem;
+    color: var(--text-muted);
+}
+.about-item i {
+    font-size: 1rem;
+    color: var(--bb-blue);
+    flex-shrink: 0;
+}
+.about-sep {
+    width: 1px;
+    height: 32px;
+    background: var(--border-color);
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .welcome-hero { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
+    .welcome-hero-text h1 { font-size: 1.6rem; }
+    .hero-logo { width: 60px; }
+    .about-strip { padding: 16px; }
+    .about-sep { display: none; }
+}
+</style>
+{% endblock %}

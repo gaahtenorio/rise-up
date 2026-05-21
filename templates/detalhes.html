@@ -1,0 +1,1538 @@
+{% extends "base.html" %}
+{% block title %}Informações — Agência {{ agencia.prefixo }} | Portal DISEC{% endblock %}
+
+{% block content %}
+<div class="detalhes-wrapper">
+
+    <div class="detalhes-search-bar">
+        <div class="detalhes-search-inner">
+            <i class="fas fa-search detalhes-search-icon"></i>
+            <input
+                type="text"
+                id="detalhes-search-input"
+                class="detalhes-search-input"
+                placeholder="Buscar outra agência por nome, prefixo ou cidade..."
+                autocomplete="off"
+                aria-label="Buscar agência"
+            >
+            <button class="detalhes-search-clear" id="detalhes-search-clear"
+                    style="display:none;" aria-label="Limpar busca">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul id="detalhes-search-results" class="detalhes-search-dropdown" role="listbox"
+            style="display:none;"></ul>
+    </div>
+
+    <header class="agency-header">
+        <div>
+            <div class="badge-row">
+                <span class="badge badge-blue">{{ agencia.segmento or 'VAREJO' }}</span>
+            </div>
+            <h1>{{ agencia.nome }}</h1>
+            <p class="sub-info">
+                <i class="fas fa-fingerprint"></i> Prefixo: <strong>{{ agencia.prefixo }}</strong>
+                <span class="sep">|</span>
+                <i class="fas fa-city"></i> {{ agencia.municipio }} — {{ agencia.uf }}
+            </p>
+        </div>
+        <div class="header-actions">
+            {% if user_level == 'Gestão' %}
+            <button class="btn btn-ghost" onclick="abrirEdicao()">
+                <i class="fas fa-edit"></i> Editar Dados
+            </button>
+            {% endif %}
+            <a href="{{ url_for('detalhes_index') }}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </header>
+
+    <div class="status-grid">
+        <div class="status-card {% if agencia.status == 'Operação Normal' %}ok{% elif agencia.status == 'Em Reforma' %}warning{% else %}info{% endif %}">
+            <p>Status de Operação</p>
+            <h4>
+                {% if agencia.status == 'Operação Normal' %}<i class="fas fa-check-circle"></i>
+                {% elif agencia.status == 'Em Reforma' %}<i class="fas fa-tools"></i>
+                {% else %}<i class="fas fa-info-circle"></i>{% endif %}
+                {{ agencia.status or 'Operação Normal' }}
+            </h4>
+        </div>
+        <div class="status-card info">
+            <p>Segmento</p>
+            <h4>{{ agencia.segmento or 'Varejo' }}</h4>
+        </div>
+        <div class="status-card {% if agencia.acessibilidade %}ok{% else %}warning{% endif %}">
+            <p>Acessibilidade</p>
+            <h4>
+                {% if agencia.acessibilidade %}
+                <i class="fas fa-wheelchair"></i> Totalmente Adaptada
+                {% else %}
+                <i class="fas fa-exclamation-triangle"></i> Parcial / Não Adaptada
+                {% endif %}
+            </h4>
+        </div>
+        <div class="status-card esg" id="card-idi">
+            <p>IDI
+                {% if agencia.zona_bioclimatica %}
+                <span style="font-size:.68rem;font-weight:600;opacity:.7;margin-left:4px;">
+                    · Zona {{ agencia.zona_bioclimatica }}
+                </span>
+                {% endif %}
+            </p>
+            <h4 id="idi-valor">
+                {% if agencia.idi is not none %}
+                <span style="color:{% if agencia.idi < 2 %}#E11D48{% elif agencia.idi < 3 %}#f59e0b{% elif agencia.idi < 4 %}#eab308{% else %}#16a34a{% endif %};">
+                    {{ agencia.idi }}
+                </span>
+                <small style="font-size:.65rem;font-weight:500;display:block;margin-top:2px;">
+                    {% if agencia.idi < 2 %}Crítico
+                    {% elif agencia.idi < 3 %}Alerta
+                    {% elif agencia.idi < 4 %}Tolerável
+                    {% elif agencia.idi < 5 %}Bom
+                    {% else %}Excelente{% endif %}
+                </small>
+                {% else %}Não informado{% endif %}
+            </h4>
+            {% if agencia.zona_bioclimatica %}
+            <small style="font-size:.72rem;opacity:.75;">
+                {{ agencia.zona_bioclimatica_descricao }}
+            </small>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="details-layout">
+
+        <div>
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-info-circle"></i> Informações Técnicas</h3>
+                <table class="info-table">
+                    <tr>
+                        <td>Endereço Completo:</td>
+                        <td>{{ agencia.endereco }}</td>
+                    </tr>
+                    {% if agencia.cep %}
+                    <tr>
+                        <td>CEP:</td>
+                        <td>{{ agencia.cep }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Gerente Responsável:</td>
+                        <td>{{ agencia.gerente or 'Não informado' }}</td>
+                    </tr>
+                    <tr>
+                        <td>Telefone de Contato:</td>
+                        <td>{{ agencia.telefone or 'Não informado' }}</td>
+                    </tr>
+                    {% if agencia.email_agencia %}
+                    <tr>
+                        <td>E-mail da Agência:</td>
+                        <td>{{ agencia.email_agencia }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if agencia.cnpj %}
+                    <tr>
+                        <td>CNPJ:</td>
+                        <td>{{ agencia.cnpj }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Classificação BACEN:</td>
+                        <td>{{ agencia.classificacao_bacen or 'Não classificada' }}</td>
+                    </tr>
+                    <tr>
+                        <td>Acessibilidade:</td>
+                        <td class="{% if agencia.acessibilidade %}text-success{% else %}text-warning{% endif %}">
+                            {% if agencia.acessibilidade %}Totalmente Adaptada (NBR 9050)
+                            {% else %}Parcial / Não Adaptada{% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-seedling"></i> Monitoramento de Recursos (ESG)</h3>
+
+                <!-- Ambiental -->
+                <h5 style="color:var(--color-green);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">
+                    <i class="fas fa-leaf"></i> Ambiental
+                </h5>
+
+                {% if agencia.consumo_energia %}
+                <div class="resource-item">
+                    <div class="resource-header">
+                        <span><i class="fas fa-bolt"></i> Energia</span>
+                        <span class="fw-bold">{{ agencia.consumo_energia }} kWh <small>/mês</small></span>
+                    </div>
+                    <div class="resource-track">
+                        <div class="resource-fill warning"
+                             style="width:{{ [agencia.consumo_energia / 15, 100] | min }}%"></div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted" style="margin-bottom:10px;font-size:.85rem;">
+                    <i class="fas fa-bolt"></i> Energia: <em>Não informado</em>
+                </p>
+                {% endif %}
+
+                {% if agencia.consumo_agua %}
+                <div class="resource-item">
+                    <div class="resource-header">
+                        <span><i class="fas fa-tint"></i> Água</span>
+                        <span class="fw-bold">{{ agencia.consumo_agua }} m³ <small>/mês</small></span>
+                    </div>
+                    <div class="resource-track">
+                        <div class="resource-fill success"
+                             style="width:{{ [agencia.consumo_agua / 1, 100] | min }}%"></div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted" style="margin-bottom:10px;font-size:.85rem;">
+                    <i class="fas fa-tint"></i> Água: <em>Não informado</em>
+                </p>
+                {% endif %}
+
+                {# ── Cálculo de alerta de eficiência energética ──────────────────── #}
+                {% set efic_mensal = agencia.eficiencia_energetica if agencia.eficiencia_energetica is not none
+                                     else ((agencia.consumo_energia / agencia.area_util) | round(2)
+                                           if agencia.consumo_energia and agencia.area_util else none) %}
+                {% set efic_anual  = (efic_mensal * 12) | round(1) if efic_mensal is not none else none %}
+                {% set limite_zona = agencia.zona_bioclimatica_consumo_ref %}
+                {% set acima_limite = (efic_anual is not none and limite_zona is not none and efic_anual > limite_zona) %}
+
+                {# ── Banner de alerta quando acima do limite ──────────────────────── #}
+                {% if acima_limite %}
+                <div class="efic-alerta-banner" role="alert">
+                    <div class="efic-alerta-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="efic-alerta-body">
+                        <strong>Consumo acima do limite da Zona {{ agencia.zona_bioclimatica }}</strong>
+                        <span>
+                            Eficiência anual: <strong>{{ efic_anual }} kWh/m²·ano</strong>
+                            — Limite NBR 15220: <strong>{{ limite_zona }} kWh/m²·ano</strong>
+                            <span class="efic-alerta-excesso">
+                                (+{{ ((efic_anual - limite_zona) / limite_zona * 100) | round(1) }}% acima)
+                            </span>
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <table class="info-table" style="margin-bottom:16px;">
+                    <tr>
+                        <td><i class="fas fa-ruler-combined"></i> Área Útil:</td>
+                        <td>
+                            {% if agencia.area_util is not none %}
+                            {{ agencia.area_util | round(2) | string | replace('.0', '') }} m²
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-plug"></i> Eficiência Energética:</td>
+                        <td>
+                            {% if efic_mensal is not none %}
+                            <span class="efic-valor {% if acima_limite %}efic-acima{% else %}efic-ok{% endif %}">
+                                <i class="fas {% if acima_limite %}fa-arrow-up{% else %}fa-check{% endif %}"></i>
+                                {{ efic_mensal }} kWh/m²<small>/mês</small>
+                            </span>
+                            {% if efic_anual is not none %}
+                            <small class="text-muted" style="display:block;margin-top:2px;">
+                                ≈ {{ efic_anual }} kWh/m²·ano
+                                {% if limite_zona %}
+                                · Limite zona: {{ limite_zona }} kWh/m²·ano
+                                {% if acima_limite %}
+                                <span style="color:#E11D48;font-weight:700;">⚠ Acima</span>
+                                {% else %}
+                                <span style="color:#16a34a;font-weight:700;">✓ Dentro</span>
+                                {% endif %}
+                                {% endif %}
+                            </small>
+                            {% endif %}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-sun"></i> Zona Bioclimática:</td>
+                        <td>
+                            {% if agencia.zona_bioclimatica %}
+                            <strong>Zona {{ agencia.zona_bioclimatica }}</strong>
+                            — {{ agencia.zona_bioclimatica_descricao }}
+                            <br>
+                            <small class="text-muted">
+                                Consumo máx. referência: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
+                            </small>
+                            {% else %}
+                            <em class="text-muted">Não informada</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-tachometer-alt"></i> IDI:</td>
+                        <td>
+                            {% if agencia.idi is not none %}
+                            {% set idi_color = '#E11D48' if agencia.idi < 2 else ('#f59e0b' if agencia.idi < 3 else ('#eab308' if agencia.idi < 4 else '#16a34a')) %}
+                            <strong style="color:{{ idi_color }};">{{ agencia.idi }}</strong>
+                            <small class="text-muted" style="margin-left:6px;">
+                                — {% if agencia.idi < 2 %}Crítico (acima do limite da zona)
+                                {% elif agencia.idi < 3 %}Alerta (próximo do limite)
+                                {% elif agencia.idi < 4 %}Tolerável
+                                {% elif agencia.idi < 5 %}Bom
+                                {% else %}Excelente{% endif %}
+                            </small>
+                            {% if agencia.eficiencia_energetica is not none %}
+                            <br><small class="text-muted" style="font-size:.78rem;">
+                                Eficiência: {{ agencia.eficiencia_energetica }} kWh/m²
+                                {% if agencia.zona_bioclimatica_consumo_ref %}
+                                · Limite zona: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
+                                {% endif %}
+                            </small>
+                            {% endif %}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-trash-alt"></i> Resíduos Sólidos:</td>
+                        <td>
+                            {% if agencia.residuos_solidos is not none %}
+                            {{ agencia.residuos_solidos }} kg/mês
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Social -->
+                <h5 style="color:var(--bb-blue);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;margin-top:4px;">
+                    <i class="fas fa-users"></i> Social
+                </h5>
+                <table class="info-table" style="margin-bottom:16px;">
+                    <tr>
+                        <td><i class="fas fa-wheelchair"></i> Acessibilidade (NBR 9050):</td>
+                        <td class="{% if agencia.acessibilidade %}text-success{% endif %}">
+                            {% if agencia.acessibilidade %}Totalmente Adaptada
+                            {% else %}<em class="text-muted">Parcial / Não Adaptada</em>{% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-id-badge"></i> Nº de Colaboradores:</td>
+                        <td>
+                            {% if agencia.num_colaboradores is not none %}
+                            {{ agencia.num_colaboradores }}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Governança -->
+                <h5 style="color:var(--color-purple);font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;margin-top:4px;">
+                    <i class="fas fa-landmark"></i> Governança
+                </h5>
+                <table class="info-table">
+                    <tr>
+                        <td><i class="fas fa-fire-extinguisher"></i> Última Vistoria Bombeiros:</td>
+                        <td>
+                            {% if agencia.data_ultima_vistoria_bombeiros %}
+                            {{ agencia.data_ultima_vistoria_bombeiros.strftime('%d/%m/%Y') }}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Seção Arquivos DWG -->
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-drafting-compass"></i> Arquivos DWG</h3>
+                <div id="dwg-loading" style="color:var(--text-muted);font-size:.85rem;">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando arquivos...
+                </div>
+                <div id="dwg-container" style="display:none;">
+                    <table class="data-table" id="dwg-tabela" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>Tamanho</th>
+                                <th>Data de Upload</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dwg-tbody"></tbody>
+                    </table>
+                    <p id="dwg-vazio" style="color:var(--text-muted);font-size:.85rem;display:none;">
+                        Nenhum arquivo DWG cadastrado.
+                    </p>
+                </div>
+                {% if user_level == 'Gestão' %}
+                <div style="margin-top:14px;">
+                    <label class="btn btn-ghost" style="cursor:pointer;">
+                        <i class="fas fa-upload"></i> Enviar DWG
+                        <input type="file" id="dwg-input-file" accept=".dwg"
+                               style="display:none;" onchange="uploadDWG(this)">
+                    </label>
+                    <span id="dwg-upload-msg" style="font-size:.82rem;margin-left:8px;"></span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Seção Horários SAA -->
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-clock"></i> Horários SAA</h3>
+                <div id="saa-loading" style="color:var(--text-muted);font-size:.85rem;">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando horários...
+                </div>
+                <div id="saa-container" style="display:none;">
+                    <table class="data-table" id="saa-tabela" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Dia da Semana</th>
+                                <th>Abertura</th>
+                                <th>Encerramento</th>
+                                {% if user_level == 'Gestão' %}<th>Ações</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody id="saa-tbody"></tbody>
+                    </table>
+                    <p id="saa-vazio" style="color:var(--text-muted);font-size:.85rem;display:none;">
+                        Horários de funcionamento da SAA não informados.
+                    </p>
+                </div>
+                {% if user_level == 'Gestão' %}
+                <div style="margin-top:14px;border-top:1px solid var(--border-color);padding-top:14px;">
+                    <h5 style="font-size:.82rem;font-weight:700;color:var(--bb-blue);margin-bottom:10px;">
+                        Adicionar Horário
+                    </h5>
+                    <div class="form-grid cols-3" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label class="form-label">Dia</label>
+                            <select class="form-input" id="saa-input-dia">
+                                <option value="">Selecione...</option>
+                                {% for dia in ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'] %}
+                                <option value="{{ dia }}">{{ dia }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Abertura</label>
+                            <input type="time" class="form-input" id="saa-input-abertura">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Encerramento</label>
+                            <input type="time" class="form-input" id="saa-input-encerramento">
+                        </div>
+                    </div>
+                    <div id="saa-form-msg" class="form-msg" style="display:none;"></div>
+                    <button class="btn btn-primary" onclick="adicionarHorarioSAA()" style="margin-top:4px;">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-map-marked-alt"></i> Localização Exata</h3>
+
+                {% if agencia.lat and agencia.lng %}
+                <div id="mini-map" class="mini-map-box"
+                     style="height:220px;border-radius:8px;overflow:hidden;"></div>
+                {% else %}
+                <div class="mini-map-box">
+                    <div class="map-placeholder">
+                        <i class="fas fa-map-pin"></i>
+                        <p>Coordenadas não cadastradas</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="location-footer">
+                    <p class="address-text">
+                        <i class="fas fa-location-dot"></i> {{ agencia.endereco }}
+                    </p>
+                    <a class="btn btn-outline"
+                       href="https://www.google.com/maps/search/{{ agencia.endereco | urlencode }}"
+                       target="_blank" rel="noopener">
+                        Como Chegar <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title"><i class="fas fa-file-pdf"></i> Documentos</h3>
+                <ul class="doc-list">
+                    <li><a href="#"><i class="fas fa-file-download"></i> Planta Baixa.pdf</a></li>
+                    <li><a href="#"><i class="fas fa-file-download"></i> Alvará de Funcionamento.pdf</a></li>
+                </ul>
+
+                <!-- Vistoria Corpo de Bombeiros (dinâmico) -->
+                <div id="vistoria-container" style="margin-top:16px;">
+                    <div id="vistoria-loading" style="color:var(--text-muted);font-size:.85rem;">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando vistoria...
+                    </div>
+                    <div id="vistoria-dados" style="display:none;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                            <i class="fas fa-fire-extinguisher" style="color:var(--color-red);"></i>
+                            <strong style="font-size:.9rem;">Laudo de Vistoria — Corpo de Bombeiros</strong>
+                            <span id="vistoria-badge-vencida" class="badge"
+                                  style="display:none;background:#fee2e2;color:#991b1b;">
+                                Vistoria Vencida
+                            </span>
+                        </div>
+                        <table class="info-table" style="margin-bottom:10px;">
+                            <tr>
+                                <td>Protocolo:</td>
+                                <td id="vistoria-protocolo">—</td>
+                            </tr>
+                            <tr>
+                                <td>Data de Emissão:</td>
+                                <td id="vistoria-emissao">—</td>
+                            </tr>
+                            <tr>
+                                <td>Data de Validade:</td>
+                                <td id="vistoria-validade">—</td>
+                            </tr>
+                        </table>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn btn-outline" id="btn-download-vistoria"
+                                    onclick="downloadVistoria()" style="display:none;">
+                                <i class="fas fa-file-download"></i> Baixar PDF
+                            </button>
+                            {% if user_level == 'Gestão' %}
+                            <button class="btn btn-ghost" onclick="abrirFormVistoria()">
+                                <i class="fas fa-edit"></i> Atualizar Vistoria
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div id="vistoria-vazia" style="display:none;">
+                        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:8px;">
+                            <i class="fas fa-fire-extinguisher"></i> Vistoria não cadastrada.
+                        </p>
+                        {% if user_level == 'Gestão' %}
+                        <button class="btn btn-ghost" onclick="abrirFormVistoria()">
+                            <i class="fas fa-plus"></i> Cadastrar Vistoria
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if user_level == 'Gestão' %}
+                <!-- Formulário inline de vistoria -->
+                <div id="form-vistoria-container" style="display:none;margin-top:16px;border-top:1px solid var(--border-color);padding-top:16px;">
+                    <h5 style="font-size:.85rem;font-weight:700;color:var(--bb-blue);margin-bottom:12px;">
+                        Cadastrar / Atualizar Vistoria
+                    </h5>
+                    <div class="form-grid cols-2" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Protocolo *</label>
+                            <input type="text" class="form-input" id="vistoria-input-protocolo"
+                                   placeholder="Ex.: 2024/001234">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Data de Emissão *</label>
+                            <input type="date" class="form-input" id="vistoria-input-emissao">
+                        </div>
+                    </div>
+                    <div class="form-grid cols-2" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Data de Validade</label>
+                            <input type="date" class="form-input" id="vistoria-input-validade">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">PDF da Vistoria</label>
+                            <input type="file" class="form-input" id="vistoria-input-pdf" accept=".pdf">
+                        </div>
+                    </div>
+                    <div id="form-vistoria-msg" class="form-msg" style="display:none;"></div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+                        <button type="button" class="btn btn-ghost" onclick="fecharFormVistoria()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="salvarVistoria()">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% if user_level == 'Gestão' %}
+<div id="modal-edicao" class="modal-overlay" style="display:none;"
+     role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+            <h3>Editar Agência {{ agencia.prefixo }}</h3>
+            <button class="modal-close" onclick="fecharEdicao()" aria-label="Fechar">&times;</button>
+        </div>
+        <form id="form-edicao" onsubmit="salvarEdicao(event)">
+            <div class="form-grid cols-4-8" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Prefixo</label>
+                    <input type="text" class="form-input" value="{{ agencia.prefixo }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" class="form-input" id="edit-nome"
+                           value="{{ agencia.nome }}" required>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Município *</label>
+                    <input type="text" class="form-input" id="edit-municipio"
+                           value="{{ agencia.municipio }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UF *</label>
+                    <select class="form-input" id="edit-uf" required>
+                        {% for uf in ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] %}
+                        <option value="{{ uf }}" {% if agencia.uf == uf %}selected{% endif %}>{{ uf }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Logradouro</label>
+                <input type="text" class="form-input" id="edit-logradouro"
+                       value="{{ agencia.logradouro or '' }}">
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Número</label>
+                    <input type="text" class="form-input" id="edit-numero"
+                           value="{{ agencia.numero or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bairro</label>
+                    <input type="text" class="form-input" id="edit-bairro"
+                           value="{{ agencia.bairro or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">CEP</label>
+                    <input type="text" class="form-input" id="edit-cep"
+                           value="{{ agencia.cep or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" class="form-input" id="edit-telefone"
+                           value="{{ agencia.telefone or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Gerente</label>
+                    <input type="text" class="form-input" id="edit-gerente"
+                           value="{{ agencia.gerente or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Segmento</label>
+                    <select class="form-input" id="edit-segmento">
+                        {% for seg in ['Varejo','Empresa','Agronegócio','Estilo','Governo'] %}
+                        <option value="{{ seg }}"
+                            {% if agencia.segmento == seg %}selected{% endif %}>{{ seg }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" id="edit-status">
+                        {% for st in ['Operação Normal','Em Reforma','Fechada','Em Implantação'] %}
+                        <option value="{{ st }}"
+                            {% if agencia.status == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Acessibilidade</label>
+                    <select class="form-input" id="edit-acessibilidade">
+                        <option value="true"  {% if agencia.acessibilidade %}selected{% endif %}>Totalmente Adaptada</option>
+                        <option value="false" {% if not agencia.acessibilidade %}selected{% endif %}>Parcial / Não Adaptada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-input" id="edit-lat"
+                           value="{{ agencia.lat or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-input" id="edit-lng"
+                           value="{{ agencia.lng or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Energia (kWh/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-energia"
+                           value="{{ agencia.consumo_energia or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Água (m³/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-agua"
+                           value="{{ agencia.consumo_agua or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Área Útil (m²)</label>
+                    <input type="number" step="any" class="form-input" id="edit-area-util"
+                           value="{{ agencia.area_util or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
+                    <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
+                        <span>
+                            {% if agencia.eficiencia_energetica is not none %}{{ agencia.eficiencia_energetica }}{% else %}—{% endif %}
+                            <small style="font-size:.75rem;"> (calculado)</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Resíduos Sólidos (kg/mês)</label>
+                    <input type="number" step="any" class="form-input" id="edit-residuos"
+                           value="{{ agencia.residuos_solidos or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nº de Colaboradores</label>
+                    <input type="number" step="1" class="form-input" id="edit-colaboradores"
+                           value="{{ agencia.num_colaboradores or '' }}">
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label"><i class="fas fa-sun"></i> Zona Bioclimática (NBR 15220)</label>
+                    <select class="form-input" id="edit-zona-bioclimatica">
+                        <option value="">— Não informada —</option>
+                        <option value="1" {% if agencia.zona_bioclimatica == 1 %}selected{% endif %}>Zona 1 — Norte úmido (Manaus, Belém) · ref. 120 kWh/m²·ano</option>
+                        <option value="2" {% if agencia.zona_bioclimatica == 2 %}selected{% endif %}>Zona 2 — Nordeste litorâneo · ref. 110 kWh/m²·ano</option>
+                        <option value="3" {% if agencia.zona_bioclimatica == 3 %}selected{% endif %}>Zona 3 — Semiárido (Petrolina) · ref. 100 kWh/m²·ano</option>
+                        <option value="4" {% if agencia.zona_bioclimatica == 4 %}selected{% endif %}>Zona 4 — Centro-Oeste (Brasília, Goiânia) · ref. 95 kWh/m²·ano</option>
+                        <option value="5" {% if agencia.zona_bioclimatica == 5 %}selected{% endif %}>Zona 5 — Sudeste quente (SP interior) · ref. 90 kWh/m²·ano</option>
+                        <option value="6" {% if agencia.zona_bioclimatica == 6 %}selected{% endif %}>Zona 6 — Sul subtropical (Curitiba) · ref. 85 kWh/m²·ano</option>
+                        <option value="7" {% if agencia.zona_bioclimatica == 7 %}selected{% endif %}>Zona 7 — Sul temperado (Porto Alegre) · ref. 80 kWh/m²·ano</option>
+                        <option value="8" {% if agencia.zona_bioclimatica == 8 %}selected{% endif %}>Zona 8 — Serra Gaúcha / frio intenso · ref. 75 kWh/m²·ano</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">IDI</label>
+                    <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
+                        <span>
+                            {% if agencia.idi is not none %}{{ agencia.idi }}{% else %}—{% endif %}
+                            <small style="font-size:.75rem;"> (calculado automaticamente)</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">Classificação BACEN</label>
+                    <select class="form-input" id="edit-classificacao-bacen">
+                        <option value="">— Não classificada —</option>
+                        {% for cls in ['Agência','Posto de Atendimento Bancário (PAB)','Posto de Atendimento Eletrônico (PAE)','Unidade de Atendimento Bancário (UAB)','Correspondente Bancário'] %}
+                        <option value="{{ cls }}"
+                            {% if agencia.classificacao_bacen == cls %}selected{% endif %}>{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label class="form-label">E-mail da Agência</label>
+                    <input type="email" class="form-input" id="edit-email-agencia"
+                           value="{{ agencia.email_agencia or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CNPJ</label>
+                    <input type="text" class="form-input" id="edit-cnpj"
+                           value="{{ agencia.cnpj or '' }}"
+                           placeholder="XX.XXX.XXX/XXXX-XX">
+                </div>
+            </div>
+            <div id="form-edicao-msg" class="form-msg" style="display:none;"></div>
+            <div class="form-actions" style="margin-top:20px;">
+                <button type="button" class="btn btn-ghost" onclick="fecharEdicao()"
+                        style="margin-right:12px;">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirEdicao()  { document.getElementById('modal-edicao').style.display = 'flex'; }
+function fecharEdicao() { document.getElementById('modal-edicao').style.display = 'none'; }
+
+document.getElementById('modal-edicao').addEventListener('click', function(e) {
+    if (e.target === this) fecharEdicao();
+});
+
+async function salvarEdicao(e) {
+    e.preventDefault();
+    const body = {
+        nome:            document.getElementById('edit-nome').value.trim(),
+        municipio:       document.getElementById('edit-municipio').value.trim(),
+        uf:              document.getElementById('edit-uf').value,
+        logradouro:      document.getElementById('edit-logradouro').value.trim(),
+        numero:          document.getElementById('edit-numero').value.trim(),
+        bairro:          document.getElementById('edit-bairro').value.trim(),
+        cep:             document.getElementById('edit-cep').value.trim(),
+        telefone:        document.getElementById('edit-telefone').value.trim(),
+        gerente:         document.getElementById('edit-gerente').value.trim(),
+        segmento:        document.getElementById('edit-segmento').value,
+        status:          document.getElementById('edit-status').value,
+        acessibilidade:  document.getElementById('edit-acessibilidade').value === 'true',
+        lat:             document.getElementById('edit-lat').value   || null,
+        lng:             document.getElementById('edit-lng').value   || null,
+        consumo_energia: document.getElementById('edit-energia').value || null,
+        consumo_agua:    document.getElementById('edit-agua').value    || null,
+        area_util:            document.getElementById('edit-area-util').value || null,
+        residuos_solidos:     document.getElementById('edit-residuos').value || null,
+        num_colaboradores:    document.getElementById('edit-colaboradores').value || null,
+        zona_bioclimatica:    document.getElementById('edit-zona-bioclimatica').value || null,
+        classificacao_bacen:  document.getElementById('edit-classificacao-bacen').value || null,
+        email_agencia:        document.getElementById('edit-email-agencia').value.trim() || null,
+        cnpj:                 document.getElementById('edit-cnpj').value.trim() || null,
+    };
+    try {
+        const res  = await fetch('/api/agencias/{{ agencia.id }}', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = document.getElementById('form-edicao-msg');
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+            return;
+        }
+        fecharEdicao();
+        location.reload();
+    } catch(err) {
+        const msg = document.getElementById('form-edicao-msg');
+        msg.textContent   = 'Erro de conexão.';
+        msg.className     = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+</script>
+{% endif %}
+
+{% if agencia.lat and agencia.lng %}
+<script>
+    function initMiniMap() {
+        const pos = { lat: {{ agencia.lat }}, lng: {{ agencia.lng }} };
+
+        const miniMap = new google.maps.Map(document.getElementById('mini-map'), {
+            center: pos,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: true
+        });
+
+        const marker = new google.maps.Marker({
+            position: pos,
+            map: miniMap,
+            title: '{{ agencia.nome }}',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: '#0038A8',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2.5
+            }
+        });
+
+        const iw = new google.maps.InfoWindow({
+            content: '<strong style="font-family:Montserrat,sans-serif;color:#0038A8;">{{ agencia.nome }}</strong>'
+        });
+        marker.addListener('click', () => iw.open(miniMap, marker));
+        iw.open(miniMap, marker);
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+        async defer></script>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Alerta de eficiência energética ─────────────────────────────── */
+.efic-alerta-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #fff7ed;
+    border: 1.5px solid #f97316;
+    border-left: 5px solid #f97316;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    animation: efic-pulse 2.5s ease-in-out infinite;
+}
+@keyframes efic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,.0); }
+    50%       { box-shadow: 0 0 0 4px rgba(249,115,22,.18); }
+}
+.efic-alerta-icon {
+    font-size: 1.25rem;
+    color: #f97316;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.efic-alerta-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: .85rem;
+    color: #7c2d12;
+    line-height: 1.5;
+}
+.efic-alerta-body strong { color: #c2410c; }
+.efic-alerta-excesso {
+    display: inline-block;
+    background: #fed7aa;
+    color: #9a3412;
+    font-weight: 700;
+    font-size: .78rem;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+
+/* ── Indicador inline de eficiência ──────────────────────────────── */
+.efic-valor {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    font-size: .9rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.efic-valor small { font-weight: 400; font-size: .75rem; margin-left: 1px; }
+.efic-acima {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.efic-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.detalhes-search-bar {
+    position: relative;
+    margin-bottom: 24px;
+    z-index: 100;
+}
+
+.detalhes-search-inner {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0 16px;
+    box-shadow: var(--shadow-sm);
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.detalhes-search-inner:focus-within {
+    border-color: var(--bb-blue);
+    box-shadow: 0 0 0 3px rgba(0,56,168,.1);
+}
+
+.detalhes-search-icon {
+    color: var(--text-muted);
+    font-size: .9rem;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.detalhes-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-family: 'Montserrat', sans-serif;
+    font-size: .9rem;
+    color: var(--text-dark);
+    padding: 13px 0;
+    background: transparent;
+}
+
+.detalhes-search-input::placeholder { color: var(--text-muted); }
+
+.detalhes-search-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 50%;
+    transition: color .2s, background .2s;
+    flex-shrink: 0;
+}
+.detalhes-search-clear:hover { color: var(--color-red); background: #fef2f2; }
+
+.detalhes-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 320px;
+    overflow-y: auto;
+    list-style: none;
+    padding: 6px 0;
+    margin: 0;
+}
+
+.detalhes-search-dropdown li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.detalhes-search-dropdown li:hover,
+.detalhes-search-dropdown li.focused {
+    background: #f0f4ff;
+}
+
+.detalhes-search-dropdown .result-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--bb-blue);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem;
+    flex-shrink: 0;
+}
+.detalhes-search-dropdown .result-icon.reforma { background: #f39c12; }
+.detalhes-search-dropdown .result-icon.fechada { background: var(--color-red); }
+
+.detalhes-search-dropdown .result-info { flex: 1; min-width: 0; }
+.detalhes-search-dropdown .result-nome {
+    font-weight: 600;
+    font-size: .875rem;
+    color: var(--text-dark);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.detalhes-search-dropdown .result-sub {
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+.detalhes-search-dropdown .result-prefixo {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--bb-blue);
+    flex-shrink: 0;
+}
+
+.detalhes-search-dropdown .no-results {
+    padding: 14px 16px;
+    color: var(--text-muted);
+    font-size: .875rem;
+    text-align: center;
+    cursor: default;
+}
+.detalhes-search-dropdown .no-results:hover { background: none; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const input    = document.getElementById('detalhes-search-input');
+    const dropdown = document.getElementById('detalhes-search-results');
+    const clearBtn = document.getElementById('detalhes-search-clear');
+
+    let debounceTimer = null;
+    let focusedIndex  = -1;
+    let currentItems  = [];
+
+    function iconClass(status) {
+        if (status === 'Em Reforma') return 'reforma';
+        if (status === 'Fechada')    return 'fechada';
+        return '';
+    }
+
+    function renderDropdown(agencias) {
+        currentItems  = agencias;
+        focusedIndex  = -1;
+        dropdown.innerHTML = '';
+
+        if (!agencias.length) {
+            dropdown.innerHTML = '<li class="no-results"><i class="fas fa-search"></i> Nenhuma agência encontrada.</li>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        agencias.forEach((ag, i) => {
+            const li = document.createElement('li');
+            li.setAttribute('role', 'option');
+            li.innerHTML = `
+                <span class="result-icon ${iconClass(ag.status)}">
+                    <i class="fas fa-landmark"></i>
+                </span>
+                <span class="result-info">
+                    <span class="result-nome">${ag.nome}</span>
+                    <span class="result-sub">${ag.municipio} — ${ag.uf} &nbsp;·&nbsp; ${ag.segmento || ''}</span>
+                </span>
+                <span class="result-prefixo">${ag.prefixo}</span>
+            `;
+            li.addEventListener('mousedown', (e) => {
+                e.preventDefault(); 
+                window.location.href = '/detalhes/' + ag.prefixo;
+            });
+            dropdown.appendChild(li);
+        });
+
+        dropdown.style.display = 'block';
+    }
+
+    function hideDropdown() {
+        dropdown.style.display = 'none';
+        focusedIndex = -1;
+    }
+
+    function setFocus(index) {
+        const items = dropdown.querySelectorAll('li:not(.no-results)');
+        items.forEach(li => li.classList.remove('focused'));
+        if (index >= 0 && index < items.length) {
+            items[index].classList.add('focused');
+            items[index].scrollIntoView({ block: 'nearest' });
+        }
+        focusedIndex = index;
+    }
+
+    async function buscar(q) {
+        if (!q.trim()) { hideDropdown(); return; }
+        try {
+            const res    = await fetch('/api/agencias?q=' + encodeURIComponent(q));
+            const dados  = await res.json();
+            renderDropdown(dados.slice(0, 8));
+        } catch(err) {
+            console.error('Erro na busca:', err);
+        }
+    }
+
+    input.addEventListener('input', () => {
+        const q = input.value;
+        clearBtn.style.display = q ? 'block' : 'none';
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => buscar(q), 220);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('li:not(.no-results)');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setFocus(Math.min(focusedIndex + 1, items.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setFocus(Math.max(focusedIndex - 1, 0));
+        } else if (e.key === 'Enter') {
+            if (focusedIndex >= 0 && currentItems[focusedIndex]) {
+                window.location.href = '/detalhes/' + currentItems[focusedIndex].prefixo;
+            }
+        } else if (e.key === 'Escape') {
+            hideDropdown();
+            input.blur();
+        }
+    });
+
+    input.addEventListener('focus', () => {
+        if (input.value.trim()) buscar(input.value);
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(hideDropdown, 150);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        clearBtn.style.display = 'none';
+        hideDropdown();
+        input.focus();
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.detalhes-search-bar')) hideDropdown();
+    });
+})();
+</script>
+
+<script>
+// ─── IDI: busca limiar e aplica indicação visual ───────────────────────────
+const AGENCIA_ID = {{ agencia.id }};
+
+(async function carregarIDI() {
+    try {
+        const res = await fetch('/api/config/limiar-idi');
+        const cfg = await res.json();
+        const limiar = cfg.limiar_idi || 3.0;
+        const idi = {{ agencia.idi if agencia.idi is not none else 'null' }};
+        const card = document.getElementById('card-idi');
+        const h4   = document.getElementById('idi-valor');
+        if (idi === null) {
+            h4.textContent = 'IDI não informado';
+        } else {
+            h4.textContent = idi.toFixed(1);
+            if (idi < limiar) {
+                card.classList.add('critico');
+                card.style.borderLeftColor = 'var(--color-red)';
+                h4.style.color = 'var(--color-red)';
+            }
+        }
+    } catch(e) { console.error('Erro ao carregar limiar IDI:', e); }
+})();
+
+// ─── DWG ──────────────────────────────────────────────────────────────────
+function formatarTamanho(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toLocaleString('pt-BR', {maximumFractionDigits:1}) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toLocaleString('pt-BR', {maximumFractionDigits:1}) + ' KB';
+    return bytes + ' B';
+}
+
+async function carregarDWG() {
+    const loading   = document.getElementById('dwg-loading');
+    const container = document.getElementById('dwg-container');
+    const tabela    = document.getElementById('dwg-tabela');
+    const vazio     = document.getElementById('dwg-vazio');
+    const tbody     = document.getElementById('dwg-tbody');
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg');
+        const data = await res.json();
+        loading.style.display   = 'none';
+        container.style.display = 'block';
+        if (!data.length) {
+            vazio.style.display = 'block';
+            return;
+        }
+        tabela.style.display = 'table';
+        tbody.innerHTML = data.map(f => `
+            <tr>
+                <td><i class="fas fa-file" style="color:var(--bb-blue);margin-right:6px;"></i>${escHtml(f.nome_original)}</td>
+                <td>${formatarTamanho(f.tamanho_bytes)}</td>
+                <td>${f.enviado_em}</td>
+                <td>
+                    <a href="/api/agencias/${AGENCIA_ID}/dwg/${f.id}/download"
+                       class="btn btn-outline" style="padding:6px 12px;font-size:.78rem;">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    {% if user_level == 'Gestão' %}
+                    <button class="btn-icon delete" onclick="excluirDWG(${f.id})" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+        `).join('');
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar arquivos.';
+        console.error(e);
+    }
+}
+
+async function uploadDWG(input) {
+    const msg = document.getElementById('dwg-upload-msg');
+    if (!input.files.length) return;
+    const file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.dwg')) {
+        msg.textContent = 'Apenas arquivos DWG são aceitos.';
+        msg.style.color = 'var(--color-red)';
+        input.value = '';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('arquivo', file);
+    msg.textContent = 'Enviando...';
+    msg.style.color = 'var(--text-muted)';
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao enviar.';
+            msg.style.color = 'var(--color-red)';
+        } else {
+            msg.textContent = 'Enviado com sucesso!';
+            msg.style.color = 'var(--color-green)';
+            input.value = '';
+            await carregarDWG();
+        }
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.style.color = 'var(--color-red)';
+    }
+}
+
+async function excluirDWG(id) {
+    if (!confirm('Excluir este arquivo DWG?')) return;
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/dwg/' + id, { method: 'DELETE' });
+        if (res.ok) await carregarDWG();
+        else { const d = await res.json(); alert(d.erro || 'Erro ao excluir.'); }
+    } catch(e) { alert('Erro de conexão.'); }
+}
+
+// ─── SAA ──────────────────────────────────────────────────────────────────
+async function carregarSAA() {
+    const loading   = document.getElementById('saa-loading');
+    const container = document.getElementById('saa-container');
+    const tabela    = document.getElementById('saa-tabela');
+    const vazio     = document.getElementById('saa-vazio');
+    const tbody     = document.getElementById('saa-tbody');
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios');
+        const data = await res.json();
+        loading.style.display   = 'none';
+        container.style.display = 'block';
+        if (!data.length) {
+            vazio.style.display = 'block';
+            return;
+        }
+        tabela.style.display = 'table';
+        tbody.innerHTML = data.map(h => `
+            <tr>
+                <td>${escHtml(h.dia_semana)}</td>
+                <td>${h.hora_abertura}</td>
+                <td>${h.hora_encerramento}</td>
+                {% if user_level == 'Gestão' %}
+                <td>
+                    <button class="btn-icon delete" onclick="excluirHorario(${h.id})" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+                {% endif %}
+            </tr>
+        `).join('');
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar horários.';
+        console.error(e);
+    }
+}
+
+async function adicionarHorarioSAA() {
+    const dia   = document.getElementById('saa-input-dia').value;
+    const aber  = document.getElementById('saa-input-abertura').value;
+    const enc   = document.getElementById('saa-input-encerramento').value;
+    const msg   = document.getElementById('saa-form-msg');
+    if (!dia || !aber || !enc) {
+        msg.textContent = 'Preencha todos os campos.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+        return;
+    }
+    try {
+        const res  = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dia_semana: dia, hora_abertura: aber, hora_encerramento: enc })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+        } else {
+            msg.style.display = 'none';
+            document.getElementById('saa-input-dia').value = '';
+            document.getElementById('saa-input-abertura').value = '';
+            document.getElementById('saa-input-encerramento').value = '';
+            await carregarSAA();
+        }
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+
+async function excluirHorario(id) {
+    if (!confirm('Excluir este horário?')) return;
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/horarios/' + id, { method: 'DELETE' });
+        if (res.ok) await carregarSAA();
+        else { const d = await res.json(); alert(d.erro || 'Erro ao excluir.'); }
+    } catch(e) { alert('Erro de conexão.'); }
+}
+
+// ─── Vistoria Bombeiros ────────────────────────────────────────────────────
+async function carregarVistoria() {
+    const loading = document.getElementById('vistoria-loading');
+    const dados   = document.getElementById('vistoria-dados');
+    const vazia   = document.getElementById('vistoria-vazia');
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria');
+        loading.style.display = 'none';
+        if (res.status === 404) {
+            vazia.style.display = 'block';
+            return;
+        }
+        const v = await res.json();
+        dados.style.display = 'block';
+        document.getElementById('vistoria-protocolo').textContent = v.protocolo || '—';
+        document.getElementById('vistoria-emissao').textContent   = v.data_emissao
+            ? new Date(v.data_emissao + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        document.getElementById('vistoria-validade').textContent  = v.data_validade
+            ? new Date(v.data_validade + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        if (v.vencida) {
+            document.getElementById('vistoria-badge-vencida').style.display = 'inline-block';
+        } else {
+            document.getElementById('vistoria-badge-vencida').style.display = 'none';
+        }
+        if (v.nome_original) {
+            document.getElementById('btn-download-vistoria').style.display = 'inline-flex';
+        } else {
+            document.getElementById('btn-download-vistoria').style.display = 'none';
+        }
+    } catch(e) {
+        loading.textContent = 'Erro ao carregar vistoria.';
+        console.error(e);
+    }
+}
+
+function downloadVistoria() {
+    window.location.href = '/api/agencias/' + AGENCIA_ID + '/vistoria/download';
+}
+
+{% if user_level == 'Gestão' %}
+function abrirFormVistoria() {
+    document.getElementById('form-vistoria-container').style.display = 'block';
+}
+function fecharFormVistoria() {
+    document.getElementById('form-vistoria-container').style.display = 'none';
+}
+
+async function salvarVistoria() {
+    const protocolo  = document.getElementById('vistoria-input-protocolo').value.trim();
+    const emissao    = document.getElementById('vistoria-input-emissao').value;
+    const validade   = document.getElementById('vistoria-input-validade').value;
+    const pdfInput   = document.getElementById('vistoria-input-pdf');
+    const msg        = document.getElementById('form-vistoria-msg');
+
+    if (!protocolo || !emissao) {
+        msg.textContent = 'Protocolo e data de emissão são obrigatórios.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+        return;
+    }
+    try {
+        const res = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ protocolo, data_emissao: emissao, data_validade: validade || null })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.erro || 'Erro ao salvar.';
+            msg.className   = 'form-msg form-msg-erro';
+            msg.style.display = 'block';
+            return;
+        }
+        // Upload PDF if selected
+        if (pdfInput.files.length) {
+            const fd = new FormData();
+            fd.append('arquivo', pdfInput.files[0]);
+            const resUp = await fetch('/api/agencias/' + AGENCIA_ID + '/vistoria/upload', { method: 'POST', body: fd });
+            if (!resUp.ok) {
+                const dUp = await resUp.json();
+                msg.textContent = dUp.erro || 'Vistoria salva, mas erro no upload do PDF.';
+                msg.className   = 'form-msg form-msg-erro';
+                msg.style.display = 'block';
+                await carregarVistoria();
+                return;
+            }
+        }
+        fecharFormVistoria();
+        // Reset hidden vistoria-dados/vazia before reload
+        document.getElementById('vistoria-dados').style.display = 'none';
+        document.getElementById('vistoria-vazia').style.display = 'none';
+        document.getElementById('vistoria-loading').style.display = 'block';
+        await carregarVistoria();
+    } catch(e) {
+        msg.textContent = 'Erro de conexão.';
+        msg.className   = 'form-msg form-msg-erro';
+        msg.style.display = 'block';
+    }
+}
+{% endif %}
+
+// ─── Utilitários ──────────────────────────────────────────────────────────
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Inicialização ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    carregarDWG();
+    carregarSAA();
+    carregarVistoria();
+});
+</script>
+
+{% if agencia.lat and agencia.lng %}
+<script>
+    function initMiniMap() {
+        const pos = { lat: {{ agencia.lat }}, lng: {{ agencia.lng }} };
+
+        const miniMap = new google.maps.Map(document.getElementById('mini-map'), {
+            center: pos,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControl: true
+        });
+
+        const marker = new google.maps.Marker({
+            position: pos,
+            map: miniMap,
+            title: '{{ agencia.nome }}'
+        });
+
+        const iw = new google.maps.InfoWindow({
+            content: '<strong style="font-family:Montserrat,sans-serif;color:#0038A8;">{{ agencia.nome }}</strong>'
+        });
+        marker.addListener('click', () => iw.open(miniMap, marker));
+        iw.open(miniMap, marker);
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+        async defer></script>
+{% endif %}
+{% endblock %}

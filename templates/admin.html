@@ -1,0 +1,849 @@
+{% extends "base.html" %}
+{% block title %}Gestão DISEC | Portal DISEC{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Painel Administrativo</h1>
+    <p>Gestão de acessos, unidades e indicadores estratégicos do <strong>Portal DISEC</strong>.</p>
+</div>
+
+<div class="tab-nav" role="tablist">
+    <button class="tab-btn active" role="tab" aria-selected="true" onclick="switchTab('users', this)">
+        <i class="fas fa-users-cog"></i> Usuários
+    </button>
+    <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('agencies', this)">
+        <i class="fas fa-landmark"></i> Agências
+    </button>
+    <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('solicitacoes', this)" id="btn-tab-solicitacoes">
+        <i class="fas fa-user-clock"></i> Solicitações
+        <span id="badge-pendentes" style="display:none;background:#E11D48;color:#fff;
+              border-radius:50%;min-width:18px;height:18px;font-size:.7rem;font-weight:700;
+              align-items:center;justify-content:center;margin-left:6px;padding:0 4px;">0</span>
+    </button>
+</div>
+
+<div class="tab-panel active" id="tab-users">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Controle de Acessos</span>
+            <button class="btn btn-primary" onclick="abrirModalUsuario()">
+                <i class="fas fa-plus"></i> Novo Usuário
+            </button>
+        </div>
+        <p class="text-muted mb-4">Gerencie colaboradores e níveis de permissão do sistema.</p>
+
+        <table class="admin-table" id="tabela-usuarios">
+            <thead>
+                <tr>
+                    <th>Colaborador</th>
+                    <th>Username</th>
+                    <th>E-mail Corporativo</th>
+                    <th>Perfil</th>
+                    <th>Status</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-usuarios">
+                {% for u in usuarios %}
+                <tr id="row-user-{{ u.id }}">
+                    <td class="fw-bold">{{ u.nome }}</td>
+                    <td class="text-muted">{{ u.username }}</td>
+                    <td class="text-muted">{{ u.email }}</td>
+                    <td>
+                        {% if u.nivel == 'Gestão' %}
+                        <span class="badge badge-gestao">GESTÃO</span>
+                        {% else %}
+                        <span class="badge badge-consulta">CONSULTA</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.ativo %}
+                        <span class="badge badge-ok">Ativo</span>
+                        {% else %}
+                        <span class="badge badge-inativo">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <button class="btn-icon edit" aria-label="Editar"
+                                onclick="editarUsuario({{ u.id }}, '{{ u.nome }}', '{{ u.email }}', '{{ u.nivel }}', {{ u.ativo|lower }})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon delete" aria-label="Excluir"
+                                onclick="excluirUsuario({{ u.id }}, '{{ u.nome }}')">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="tab-panel" id="tab-agencies">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Cadastrar Nova Agência</span>
+        </div>
+        <form id="form-agencia" onsubmit="salvarAgencia(event)">
+            <input type="hidden" id="ag-id" value="">
+
+            <div class="form-grid cols-4-8">
+                <div class="form-group">
+                    <label class="form-label">Prefixo *</label>
+                    <input type="text" class="form-input" id="ag-prefixo" placeholder="Ex: 4211" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome da Agência *</label>
+                    <input type="text" class="form-input" id="ag-nome" placeholder="Ex: Agência Recife Centro" required>
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Município *</label>
+                    <input type="text" class="form-input" id="ag-municipio" placeholder="Ex: Recife" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UF *</label>
+                    <select class="form-input" id="ag-uf" required>
+                        <option value="">Selecione</option>
+                        <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+                        <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+                        <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+                        <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+                        <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                        <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+                        <option>SP</option><option>SE</option><option>TO</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Logradouro</label>
+                    <input type="text" class="form-input" id="ag-logradouro" placeholder="Rua, Avenida...">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Número</label>
+                    <input type="text" class="form-input" id="ag-numero" placeholder="S/N">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bairro</label>
+                    <input type="text" class="form-input" id="ag-bairro" placeholder="Bairro">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">CEP</label>
+                    <input type="text" class="form-input" id="ag-cep" placeholder="00000-000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" class="form-input" id="ag-telefone" placeholder="(00) 0000-0000">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Gerente Responsável</label>
+                    <input type="text" class="form-input" id="ag-gerente" placeholder="Nome do gerente">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Segmento</label>
+                    <select class="form-input" id="ag-segmento">
+                        <option value="Varejo">Varejo (PF)</option>
+                        <option value="Empresa">Empresa (PJ)</option>
+                        <option value="Agronegócio">Agronegócio</option>
+                        <option value="Estilo">Estilo / Alta Renda</option>
+                        <option value="Governo">Governo</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" id="ag-status">
+                        <option value="Operação Normal">Operação Normal</option>
+                        <option value="Em Reforma">Em Reforma</option>
+                        <option value="Fechada">Fechada</option>
+                        <option value="Em Implantação">Em Implantação</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Acessibilidade (NBR 9050)</label>
+                    <select class="form-input" id="ag-acessibilidade">
+                        <option value="true">Totalmente Adaptada</option>
+                        <option value="false">Parcial / Não Adaptada</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-input" id="ag-lat" placeholder="-15.7942">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-input" id="ag-lng" placeholder="-47.8822">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Consumo Energia (kWh/mês)</label>
+                    <input type="number" step="any" class="form-input" id="ag-energia" placeholder="1240">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consumo Água (m³/mês)</label>
+                    <input type="number" step="any" class="form-input" id="ag-agua" placeholder="42">
+                </div>
+            </div>
+
+            <div class="form-grid cols-3" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Área Útil (m²)</label>
+                    <input type="number" step="any" class="form-input" id="ag-area-util" placeholder="350">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
+                    <input type="number" step="any" class="form-input" id="ag-eficiencia-energetica" placeholder="3.54">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resíduos Sólidos (kg/mês)</label>
+                    <input type="number" step="any" class="form-input" id="ag-residuos-solidos" placeholder="80">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">IDI (1,0 – 5,0)</label>
+                    <input type="number" step="0.1" min="1" max="5" class="form-input" id="ag-idi" placeholder="3.5">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nº de Colaboradores</label>
+                    <input type="number" step="1" min="0" class="form-input" id="ag-num-colaboradores" placeholder="25">
+                </div>
+            </div>
+
+            <div class="form-grid cols-2" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">E-mail da Agência</label>
+                    <input type="email" class="form-input" id="ag-email-agencia" placeholder="agencia@bb.com.br">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CNPJ</label>
+                    <input type="text" class="form-input" id="ag-cnpj" placeholder="00.000.000/0000-00">
+                </div>
+            </div>
+
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">Classificação BACEN</label>
+                    <select class="form-input" id="ag-classificacao-bacen">
+                        <option value="">Não classificada</option>
+                        <option value="Agência">Agência</option>
+                        <option value="Posto de Atendimento Bancário (PAB)">Posto de Atendimento Bancário (PAB)</option>
+                        <option value="Posto de Atendimento Eletrônico (PAE)">Posto de Atendimento Eletrônico (PAE)</option>
+                        <option value="Unidade de Atendimento Bancário (UAB)">Unidade de Atendimento Bancário (UAB)</option>
+                        <option value="Correspondente Bancário">Correspondente Bancário</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="form-agencia-msg" class="form-msg" style="display:none;"></div>
+
+            <div class="form-actions" style="margin-top:24px;">
+                <button type="button" class="btn btn-ghost" onclick="limparFormAgencia()" style="margin-right:12px;">
+                    <i class="fas fa-times"></i> Limpar
+                </button>
+                <button type="submit" class="btn btn-primary" style="padding:12px 40px;">
+                    <i class="fas fa-save"></i> <span id="btn-salvar-texto">Salvar Agência</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="admin-card" style="margin-top:24px;">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Agências Cadastradas</span>
+            <div class="search-bar" style="max-width:320px;">
+                <i class="fas fa-search"></i>
+                <input type="text" id="admin-search-ag" placeholder="Buscar agência..." oninput="filtrarAgenciasAdmin()">
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="admin-table" id="tabela-agencias-admin">
+                <thead>
+                    <tr>
+                        <th>Prefixo</th>
+                        <th>Nome</th>
+                        <th>Município / UF</th>
+                        <th>Segmento</th>
+                        <th>IDI</th>
+                        <th>Classificação BACEN</th>
+                        <th>Status</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-agencias-admin">
+                    <tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="tab-panel" id="tab-solicitacoes">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <span class="admin-card-title">Solicitações de Acesso</span>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <select id="filtro-status-sol" class="form-input" style="width:auto;padding:6px 12px;font-size:.85rem;"
+                        onchange="carregarSolicitacoes()">
+                    <option value="pendente">Pendentes</option>
+                    <option value="">Todas</option>
+                    <option value="aprovado">Aprovadas</option>
+                    <option value="rejeitado">Rejeitadas</option>
+                </select>
+            </div>
+        </div>
+        <p class="text-muted mb-4">Aprove ou rejeite solicitações de acesso ao portal.</p>
+
+        <table class="admin-table" id="tabela-solicitacoes">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>Justificativa</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-solicitacoes">
+                <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-usuario" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modal-user-title">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="modal-user-title">Novo Usuário</h3>
+            <button class="modal-close" onclick="fecharModalUsuario()" aria-label="Fechar">&times;</button>
+        </div>
+        <form id="form-usuario" onsubmit="salvarUsuario(event)">
+            <input type="hidden" id="user-id" value="">
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Nome Completo *</label>
+                <input type="text" class="form-input" id="user-nome" required>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Username *</label>
+                <input type="text" class="form-input" id="user-username" required>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">E-mail Corporativo *</label>
+                <input type="email" class="form-input" id="user-email" required>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Senha <span id="senha-hint">(obrigatória)</span></label>
+                <input type="password" class="form-input" id="user-senha" autocomplete="new-password">
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Nível de Acesso</label>
+                <select class="form-input" id="user-nivel">
+                    <option value="Consulta">Consulta</option>
+                    <option value="Gestão">Gestão</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:16px;" id="grupo-ativo" style="display:none;">
+                <label class="form-label">Status</label>
+                <select class="form-input" id="user-ativo">
+                    <option value="true">Ativo</option>
+                    <option value="false">Inativo</option>
+                </select>
+            </div>
+            <div id="form-usuario-msg" class="form-msg" style="display:none;"></div>
+            <div class="form-actions" style="margin-top:20px;">
+                <button type="button" class="btn btn-ghost" onclick="fecharModalUsuario()" style="margin-right:12px;">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showMsg(elId, msg, tipo) {
+    const el = document.getElementById(elId);
+    el.textContent = msg;
+    el.className = 'form-msg form-msg-' + tipo;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
+    document.getElementById('tab-' + tabId).classList.add('active');
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    if (tabId === 'agencies') carregarAgenciasAdmin();
+    if (tabId === 'solicitacoes') carregarSolicitacoes();
+}
+
+function abrirModalUsuario() {
+    document.getElementById('modal-user-title').textContent = 'Novo Usuário';
+    document.getElementById('user-id').value = '';
+    document.getElementById('user-nome').value = '';
+    document.getElementById('user-username').value = '';
+    document.getElementById('user-username').disabled = false;
+    document.getElementById('user-email').value = '';
+    document.getElementById('user-senha').value = '';
+    document.getElementById('user-nivel').value = 'Consulta';
+    document.getElementById('user-ativo').value = 'true';
+    document.getElementById('senha-hint').textContent = '(obrigatória)';
+    document.getElementById('grupo-ativo').style.display = 'none';
+    document.getElementById('form-usuario-msg').style.display = 'none';
+    document.getElementById('modal-usuario').style.display = 'flex';
+}
+
+function editarUsuario(id, nome, email, nivel, ativo) {
+    document.getElementById('modal-user-title').textContent = 'Editar Usuário';
+    document.getElementById('user-id').value = id;
+    document.getElementById('user-nome').value = nome;
+    document.getElementById('user-username').disabled = true;
+    document.getElementById('user-email').value = email;
+    document.getElementById('user-senha').value = '';
+    document.getElementById('user-nivel').value = nivel;
+    document.getElementById('user-ativo').value = ativo ? 'true' : 'false';
+    document.getElementById('senha-hint').textContent = '(deixe em branco para não alterar)';
+    document.getElementById('grupo-ativo').style.display = 'block';
+    document.getElementById('form-usuario-msg').style.display = 'none';
+    document.getElementById('modal-usuario').style.display = 'flex';
+}
+
+function fecharModalUsuario() {
+    document.getElementById('modal-usuario').style.display = 'none';
+}
+
+async function salvarUsuario(e) {
+    e.preventDefault();
+    const id    = document.getElementById('user-id').value;
+    const nome  = document.getElementById('user-nome').value.trim();
+    const email = document.getElementById('user-email').value.trim();
+    const senha = document.getElementById('user-senha').value;
+    const nivel = document.getElementById('user-nivel').value;
+    const ativo = document.getElementById('user-ativo').value === 'true';
+
+    let url, method, body;
+
+    if (id) {
+        url    = `/api/usuarios/${id}`;
+        method = 'PUT';
+        body   = { nome, email, nivel, ativo };
+        if (senha) body.senha = senha;
+    } else {
+        const username = document.getElementById('user-username').value.trim();
+        if (!senha) { showMsg('form-usuario-msg', 'Senha obrigatória para novo usuário.', 'erro'); return; }
+        url    = '/api/usuarios';
+        method = 'POST';
+        body   = { username, nome, email, senha, nivel };
+    }
+
+    try {
+        const res  = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) { showMsg('form-usuario-msg', data.erro || 'Erro ao salvar.', 'erro'); return; }
+        fecharModalUsuario();
+        location.reload();
+    } catch(err) {
+        showMsg('form-usuario-msg', 'Erro de conexão.', 'erro');
+    }
+}
+
+async function excluirUsuario(id, nome) {
+    if (!confirm(`Excluir o usuário "${nome}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+        const res  = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao excluir.'); return; }
+        const row = document.getElementById(`row-user-${id}`);
+        if (row) row.remove();
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+let agenciasAdmin = [];
+
+async function carregarAgenciasAdmin() {
+    const tbody = document.getElementById('tbody-agencias-admin');
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr>';
+    try {
+        const res  = await fetch('/api/agencias');
+        agenciasAdmin = await res.json();
+        renderAgenciasAdmin(agenciasAdmin);
+    } catch(err) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Erro ao carregar.</td></tr>';
+    }
+}
+
+function renderAgenciasAdmin(lista) {
+    const tbody = document.getElementById('tbody-agencias-admin');
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhuma agência cadastrada.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(ag => `
+        <tr id="row-ag-${ag.id}">
+            <td class="fw-bold">${ag.prefixo}</td>
+            <td>${ag.nome}</td>
+            <td class="text-muted">${ag.municipio} / ${ag.uf}</td>
+            <td>${ag.segmento || '-'}</td>
+            <td>${ag.idi != null ? ag.idi : '-'}</td>
+            <td>${ag.classificacao_bacen || 'Não classificada'}</td>
+            <td><span class="badge ${badgeStatus(ag.status)}">${ag.status || '-'}</span></td>
+            <td class="text-center">
+                <button class="btn-icon edit" onclick="preencherFormAgencia(${ag.id})" aria-label="Editar"><i class="fas fa-edit"></i></button>
+                <a href="/detalhes/${ag.prefixo}" class="btn-icon" style="color:var(--bb-blue)" aria-label="Ver detalhes" target="_blank"><i class="fas fa-eye"></i></a>
+                <button class="btn-icon delete" onclick="excluirAgencia(${ag.id}, '${ag.nome.replace(/'/g,"\\'")}', '${ag.prefixo}')" aria-label="Excluir"><i class="fas fa-trash-alt"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function badgeStatus(status) {
+    if (status === 'Operação Normal') return 'badge-ok';
+    if (status === 'Em Reforma')      return 'badge-reforma';
+    if (status === 'Fechada')         return 'badge-inativo';
+    return 'badge-consulta';
+}
+
+function filtrarAgenciasAdmin() {
+    const q = document.getElementById('admin-search-ag').value.toLowerCase();
+    const filtradas = agenciasAdmin.filter(ag =>
+        ag.nome.toLowerCase().includes(q) ||
+        ag.prefixo.toLowerCase().includes(q) ||
+        ag.municipio.toLowerCase().includes(q) ||
+        (ag.uf || '').toLowerCase().includes(q)
+    );
+    renderAgenciasAdmin(filtradas);
+}
+
+function preencherFormAgencia(id) {
+    const ag = agenciasAdmin.find(a => a.id === id);
+    if (!ag) return;
+    document.getElementById('ag-id').value          = ag.id;
+    document.getElementById('ag-prefixo').value     = ag.prefixo;
+    document.getElementById('ag-prefixo').readOnly  = true;
+    document.getElementById('ag-nome').value        = ag.nome;
+    document.getElementById('ag-municipio').value   = ag.municipio;
+    document.getElementById('ag-uf').value          = ag.uf;
+    document.getElementById('ag-logradouro').value  = ag.logradouro || '';
+    document.getElementById('ag-numero').value      = ag.numero || '';
+    document.getElementById('ag-bairro').value      = ag.bairro || '';
+    document.getElementById('ag-cep').value         = ag.cep || '';
+    document.getElementById('ag-telefone').value    = ag.telefone || '';
+    document.getElementById('ag-gerente').value     = ag.gerente || '';
+    document.getElementById('ag-segmento').value    = ag.segmento || 'Varejo';
+    document.getElementById('ag-status').value      = ag.status || 'Operação Normal';
+    document.getElementById('ag-acessibilidade').value = ag.acessibilidade ? 'true' : 'false';
+    document.getElementById('ag-lat').value         = ag.lat || '';
+    document.getElementById('ag-lng').value         = ag.lng || '';
+    document.getElementById('ag-energia').value     = ag.consumo_energia || '';
+    document.getElementById('ag-agua').value        = ag.consumo_agua || '';
+    document.getElementById('ag-area-util').value              = ag.area_util != null ? ag.area_util : '';
+    document.getElementById('ag-eficiencia-energetica').value  = ag.eficiencia_energetica != null ? ag.eficiencia_energetica : '';
+    document.getElementById('ag-residuos-solidos').value       = ag.residuos_solidos != null ? ag.residuos_solidos : '';
+    document.getElementById('ag-idi').value                    = ag.idi != null ? ag.idi : '';
+    document.getElementById('ag-num-colaboradores').value      = ag.num_colaboradores != null ? ag.num_colaboradores : '';
+    document.getElementById('ag-email-agencia').value          = ag.email_agencia || '';
+    document.getElementById('ag-cnpj').value                   = ag.cnpj || '';
+    document.getElementById('ag-classificacao-bacen').value    = ag.classificacao_bacen || '';
+    document.getElementById('btn-salvar-texto').textContent = 'Atualizar Agência';
+    document.querySelector('.admin-card .admin-card-title').textContent = 'Editando: ' + ag.nome;
+    document.getElementById('form-agencia').scrollIntoView({ behavior: 'smooth' });
+}
+
+function limparFormAgencia() {
+    document.getElementById('ag-id').value = '';
+    document.getElementById('ag-prefixo').readOnly = false;
+    document.getElementById('form-agencia').reset();
+    document.getElementById('btn-salvar-texto').textContent = 'Salvar Agência';
+    document.querySelector('.admin-card .admin-card-title').textContent = 'Cadastrar Nova Agência';
+    document.getElementById('form-agencia-msg').style.display = 'none';
+}
+
+async function salvarAgencia(e) {
+    e.preventDefault();
+    const id = document.getElementById('ag-id').value;
+
+    const body = {
+        prefixo:         document.getElementById('ag-prefixo').value.trim(),
+        nome:            document.getElementById('ag-nome').value.trim(),
+        municipio:       document.getElementById('ag-municipio').value.trim(),
+        uf:              document.getElementById('ag-uf').value,
+        logradouro:      document.getElementById('ag-logradouro').value.trim(),
+        numero:          document.getElementById('ag-numero').value.trim(),
+        bairro:          document.getElementById('ag-bairro').value.trim(),
+        cep:             document.getElementById('ag-cep').value.trim(),
+        telefone:        document.getElementById('ag-telefone').value.trim(),
+        gerente:         document.getElementById('ag-gerente').value.trim(),
+        segmento:        document.getElementById('ag-segmento').value,
+        status:          document.getElementById('ag-status').value,
+        acessibilidade:  document.getElementById('ag-acessibilidade').value === 'true',
+        lat:             document.getElementById('ag-lat').value || null,
+        lng:             document.getElementById('ag-lng').value || null,
+        consumo_energia:        document.getElementById('ag-energia').value || null,
+        consumo_agua:           document.getElementById('ag-agua').value || null,
+        area_util:              document.getElementById('ag-area-util').value || null,
+        eficiencia_energetica:  document.getElementById('ag-eficiencia-energetica').value || null,
+        residuos_solidos:       document.getElementById('ag-residuos-solidos').value || null,
+        idi:                    document.getElementById('ag-idi').value || null,
+        num_colaboradores:      document.getElementById('ag-num-colaboradores').value || null,
+        email_agencia:          document.getElementById('ag-email-agencia').value.trim() || null,
+        cnpj:                   document.getElementById('ag-cnpj').value.trim() || null,
+        classificacao_bacen:    document.getElementById('ag-classificacao-bacen').value || null,
+    };
+
+    const url    = id ? `/api/agencias/${id}` : '/api/agencias';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const res  = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) { showMsg('form-agencia-msg', data.erro || 'Erro ao salvar.', 'erro'); return; }
+        showMsg('form-agencia-msg', id ? 'Agência atualizada com sucesso!' : 'Agência cadastrada com sucesso!', 'ok');
+        limparFormAgencia();
+        carregarAgenciasAdmin();
+    } catch(err) {
+        showMsg('form-agencia-msg', 'Erro de conexão.', 'erro');
+    }
+}
+
+async function excluirAgencia(id, nome, prefixo) {
+    if (!confirm(`Excluir a agência "${nome}" (${prefixo})? Esta ação não pode ser desfeita.`)) return;
+    try {
+        const res  = await fetch(`/api/agencias/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao excluir.'); return; }
+        agenciasAdmin = agenciasAdmin.filter(a => a.id !== id);
+        renderAgenciasAdmin(agenciasAdmin);
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+document.getElementById('modal-usuario').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalUsuario();
+});
+
+// ── Solicitações de Acesso ─────────────────────────────────────────────────────
+
+async function carregarSolicitacoes() {
+    const status = document.getElementById('filtro-status-sol').value;
+    const tbody  = document.getElementById('tbody-solicitacoes');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>';
+    try {
+        const res  = await fetch('/api/solicitacoes?status=' + encodeURIComponent(status));
+        const data = await res.json();
+        renderSolicitacoes(data);
+    } catch(err) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Erro ao carregar.</td></tr>';
+    }
+}
+
+function renderSolicitacoes(lista) {
+    const tbody = document.getElementById('tbody-solicitacoes');
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma solicitação encontrada.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(s => {
+        const badgeCls = s.status === 'pendente'   ? 'badge-reforma'
+                       : s.status === 'aprovado'   ? 'badge-ok'
+                       : 'badge-inativo';
+        const label    = s.status === 'pendente'   ? 'Pendente'
+                       : s.status === 'aprovado'   ? 'Aprovado'
+                       : 'Rejeitado';
+        const acoes = s.status === 'pendente' ? `
+            <button class="btn btn-primary" style="padding:5px 12px;font-size:.8rem;margin-right:4px;"
+                    onclick="aprovarSolicitacao(${s.id}, '${s.nome.replace(/'/g,"\\'")}')">
+                <i class="fas fa-check"></i> Aprovar
+            </button>
+            <button class="btn btn-ghost" style="padding:5px 12px;font-size:.8rem;color:#E11D48;border-color:#E11D48;"
+                    onclick="rejeitarSolicitacao(${s.id}, '${s.nome.replace(/'/g,"\\'")}')">
+                <i class="fas fa-times"></i> Rejeitar
+            </button>`
+            : s.status === 'aprovado' ? `
+            <button class="btn btn-ghost" style="padding:5px 12px;font-size:.8rem;"
+                    onclick="reenviarSolicitacao(${s.id}, '${s.nome.replace(/'/g,"\\'")}')">
+                <i class="fas fa-paper-plane"></i> Reenviar link
+            </button>` : '—';
+        return `
+        <tr id="row-sol-${s.id}">
+            <td class="fw-bold">${s.nome}</td>
+            <td class="text-muted">${s.email}</td>
+            <td style="max-width:200px;white-space:normal;font-size:.85rem;">${s.justificativa || '—'}</td>
+            <td class="text-muted" style="white-space:nowrap;">${s.criado_em}</td>
+            <td><span class="badge ${badgeCls}">${label}</span></td>
+            <td class="text-center" style="white-space:nowrap;">${acoes}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function aprovarSolicitacao(id, nome) {
+    if (!confirm(`Aprovar acesso para "${nome}"? Um e-mail com link de criação de senha será enviado.`)) return;
+    try {
+        const res  = await fetch(`/api/solicitacoes/${id}/aprovar`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao aprovar.'); return; }
+
+        if (data.email_enviado) {
+            alert(`✅ Acesso aprovado!\n\nE-mail enviado para ${nome} com o link de criação de senha.\nO link expira em 24 horas.`);
+        } else {
+            // E-mail falhou — exibe o link para o admin copiar manualmente
+            const copiado = await mostrarLinkManual(nome, data.link);
+        }
+
+        carregarSolicitacoes();
+        atualizarBadgePendentes();
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+function mostrarLinkManual(nome, link) {
+    return new Promise(resolve => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;
+            display:flex;align-items:center;justify-content:center;padding:16px;
+        `;
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:12px;padding:28px;max-width:520px;width:100%;
+                        box-shadow:0 8px 32px rgba(0,0,0,.2);font-family:Montserrat,sans-serif;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                    <i class="fas fa-exclamation-triangle" style="color:#f97316;font-size:1.4rem;"></i>
+                    <h3 style="margin:0;font-size:1rem;color:#1e293b;">E-mail não enviado</h3>
+                </div>
+                <p style="color:#475569;font-size:.9rem;margin-bottom:8px;">
+                    O acesso de <strong>${nome}</strong> foi aprovado, mas o e-mail não pôde ser enviado
+                    (verifique as configurações SMTP no servidor).
+                </p>
+                <p style="color:#475569;font-size:.9rem;margin-bottom:12px;">
+                    Copie o link abaixo e envie manualmente para o usuário. <strong>Válido por 24 horas.</strong>
+                </p>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;">
+                    <input id="link-manual-input" type="text" value="${link}" readonly
+                           style="flex:1;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;
+                                  font-size:.82rem;font-family:monospace;color:#1e293b;background:#f8fafc;">
+                    <button onclick="copiarLink()" id="btn-copiar-link"
+                            style="padding:10px 16px;background:#0038A8;color:#FCF000;border:none;
+                                   border-radius:8px;cursor:pointer;font-weight:700;font-size:.85rem;
+                                   white-space:nowrap;">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                <div style="text-align:right;">
+                    <button onclick="this.closest('[data-modal]').remove();resolve();"
+                            id="btn-fechar-link-modal"
+                            style="padding:10px 24px;background:#f1f5f9;color:#475569;border:none;
+                                   border-radius:8px;cursor:pointer;font-weight:600;">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.setAttribute('data-modal', '');
+        document.body.appendChild(modal);
+
+        window.copiarLink = function() {
+            const input = document.getElementById('link-manual-input');
+            input.select();
+            document.execCommand('copy');
+            const btn = document.getElementById('btn-copiar-link');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+            btn.style.background = '#16a34a';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+                btn.style.background = '#0038A8';
+            }, 2000);
+        };
+
+        document.getElementById('btn-fechar-link-modal').addEventListener('click', () => {
+            modal.remove();
+            resolve();
+        });
+        modal.addEventListener('click', e => {
+            if (e.target === modal) { modal.remove(); resolve(); }
+        });
+    });
+}
+
+async function rejeitarSolicitacao(id, nome) {
+    if (!confirm(`Rejeitar a solicitação de "${nome}"? O usuário será notificado por e-mail.`)) return;
+    try {
+        const res  = await fetch(`/api/solicitacoes/${id}/rejeitar`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao rejeitar.'); return; }
+        carregarSolicitacoes();
+        atualizarBadgePendentes();
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+async function reenviarSolicitacao(id, nome) {
+    if (!confirm(`Reenviar link de criação de senha para "${nome}"? Um novo link válido por 24h será enviado.`)) return;
+    try {
+        const res  = await fetch(`/api/solicitacoes/${id}/reenviar`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.erro || 'Erro ao reenviar.'); return; }
+
+        if (data.email_enviado) {
+            alert(`✅ Link reenviado com sucesso para ${nome}!`);
+        } else {
+            await mostrarLinkManual(nome, data.link);
+        }
+    } catch(err) {
+        alert('Erro de conexão.');
+    }
+}
+
+async function atualizarBadgePendentes() {
+    try {
+        const res  = await fetch('/api/solicitacoes?status=pendente');
+        const data = await res.json();
+        const badge = document.getElementById('badge-pendentes');
+        if (data.length > 0) {
+            badge.textContent = data.length;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch(e) { /* silencioso */ }
+}
+
+// Carrega badge ao abrir a página
+atualizarBadgePendentes();
+
+// Abre aba de solicitações se vier da URL com #tab-solicitacoes
+if (window.location.hash === '#tab-solicitacoes') {
+    const btn = document.getElementById('btn-tab-solicitacoes');
+    if (btn) btn.click();
+}
+</script>
+{% endblock %}
