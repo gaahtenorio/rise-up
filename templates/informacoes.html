@@ -108,6 +108,8 @@
             <option value="nome">Nome</option>
             <option value="prefixo">Prefixo</option>
             <option value="municipio">Cidade</option>
+            <option value="area_desc">Área Útil (maior → menor)</option>
+            <option value="area_asc">Área Útil (menor → maior)</option>
             <option value="idi_asc">IDI (menor → maior)</option>
             <option value="idi_desc">IDI (maior → menor)</option>
         </select>
@@ -126,13 +128,14 @@
                     <th>Segmento</th>
                     <th>Classificação BACEN</th>
                     <th style="text-align:center;">Zona Bioclim.</th>
+                    <th style="text-align:right;">Área Útil (m²)</th>
                     <th style="text-align:center;">Status</th>
                     <th style="text-align:center;">IDI</th>
                     <th style="text-align:center;">Ação</th>
                 </tr>
             </thead>
             <tbody id="info-tbody">
-                <tr><td colspan="9" class="text-center text-muted" style="padding:32px;">
+                <tr><td colspan="10" class="text-center text-muted" style="padding:32px;">
                     <i class="fas fa-spinner fa-spin"></i> Carregando agências...
                 </td></tr>
             </tbody>
@@ -226,6 +229,8 @@ function renderTabela(lista) {
     if (ordem === 'nome')      lista.sort((a,b) => a.nome.localeCompare(b.nome));
     else if (ordem === 'prefixo')   lista.sort((a,b) => a.prefixo.localeCompare(b.prefixo));
     else if (ordem === 'municipio') lista.sort((a,b) => a.municipio.localeCompare(b.municipio));
+    else if (ordem === 'area_desc') lista.sort((a,b) => (b.area_util ?? -1) - (a.area_util ?? -1));
+    else if (ordem === 'area_asc')  lista.sort((a,b) => (a.area_util ?? 999999) - (b.area_util ?? 999999));
     else if (ordem === 'idi_asc')   lista.sort((a,b) => (a.idi ?? 999) - (b.idi ?? 999));
     else if (ordem === 'idi_desc')  lista.sort((a,b) => (b.idi ?? -1) - (a.idi ?? -1));
 
@@ -235,7 +240,7 @@ function renderTabela(lista) {
     count.textContent = `${lista.length} agência(s) encontrada(s)`;
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted" style="padding:32px;">
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted" style="padding:32px;">
             <i class="fas fa-search" style="font-size:1.5rem;opacity:.3;display:block;margin-bottom:8px;"></i>
             Nenhuma agência encontrada com os filtros aplicados.
         </td></tr>`;
@@ -263,6 +268,11 @@ function renderTabela(lista) {
             <td>${escHtml(ag.segmento || '—')}</td>
             <td style="font-size:.78rem;">${escHtml(ag.classificacao_bacen || 'Não classificada')}</td>
             <td style="text-align:center;">${zonaHtml}</td>
+            <td style="text-align:right;">
+                ${ag.area_util != null
+                    ? `<span style="font-weight:600;">${Number(ag.area_util).toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:2})} m²</span>`
+                    : `<span style="color:var(--text-muted);font-size:.78rem;">—</span>`}
+            </td>
             <td style="text-align:center;"><span class="badge ${statusClass}">${escHtml(ag.status || '—')}</span></td>
             <td style="text-align:center;">${idiHtml}</td>
             <td style="text-align:center;" onclick="event.stopPropagation()">

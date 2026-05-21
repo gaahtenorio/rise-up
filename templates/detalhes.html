@@ -196,6 +196,16 @@
 
                 <table class="info-table" style="margin-bottom:16px;">
                     <tr>
+                        <td><i class="fas fa-ruler-combined"></i> Área Útil:</td>
+                        <td>
+                            {% if agencia.area_util is not none %}
+                            {{ agencia.area_util | round(2) | string | replace('.0', '') }} m²
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
                         <td><i class="fas fa-plug"></i> Eficiência Energética:</td>
                         <td>
                             {% if agencia.eficiencia_energetica is not none %}
@@ -237,7 +247,7 @@
                             </small>
                             {% if agencia.eficiencia_energetica is not none %}
                             <br><small class="text-muted" style="font-size:.78rem;">
-                                Eficiência: {{ agencia.eficiencia_energetica }} kWh/m²·ano
+                                Eficiência: {{ agencia.eficiencia_energetica }} kWh/m²
                                 {% if agencia.zona_bioclimatica_consumo_ref %}
                                 · Limite zona: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
                                 {% endif %}
@@ -649,7 +659,7 @@
                            value="{{ agencia.area_util or '' }}">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Eficiência Energética (kWh/m²·ano)</label>
+                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
                     <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
                         <span>
@@ -830,7 +840,7 @@ async function salvarEdicao(e) {
         iw.open(miniMap, marker);
     }
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
         async defer></script>
 {% endif %}
 {% endblock %}
@@ -1420,7 +1430,7 @@ document.addEventListener('DOMContentLoaded', function() {
         iw.open(miniMap, marker);
     }
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
         async defer></script>
 {% endif %}
 {% endblock %}

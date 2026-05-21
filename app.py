@@ -374,12 +374,12 @@ def email_rejeicao(solicitacao):
 
 
 def calcular_eficiencia_energetica(consumo_energia, area_util):
-    """Calcula eficiência energética anual em kWh/m²·ano.
-    Retorna round(consumo * 12 / area, 2) ou None se area_util for zero/None.
+    """Calcula eficiência energética mensal em kWh/m².
+    Retorna round(consumo / area, 2) ou None se area_util for zero/None.
     """
     if not consumo_energia or not area_util:
         return None
-    return round((consumo_energia * 12) / area_util, 2)
+    return round(consumo_energia / area_util, 2)
 
 
 def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
@@ -981,6 +981,23 @@ def api_agencias_deletar(agencia_id):
     db.session.delete(ag)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@app.route('/api/admin/recalcular-eficiencia', methods=['POST'])
+@gestao_required
+def api_recalcular_eficiencia():
+    """Recalcula eficiência energética e IDI de todas as agências com os dados disponíveis."""
+    agencias = Agencia.query.all()
+    atualizadas = 0
+    for ag in agencias:
+        nova_efic = calcular_eficiencia_energetica(ag.consumo_energia, ag.area_util)
+        novo_idi  = calcular_idi_por_zona(ag.consumo_energia, ag.area_util, ag.zona_bioclimatica)
+        if nova_efic != ag.eficiencia_energetica or novo_idi != ag.idi:
+            ag.eficiencia_energetica = nova_efic
+            ag.idi = novo_idi
+            atualizadas += 1
+    db.session.commit()
+    return jsonify({'ok': True, 'atualizadas': atualizadas})
 
 
 @app.route('/api/agencias/<int:agencia_id>/dwg', methods=['GET'])
