@@ -373,6 +373,46 @@ def email_rejeicao(solicitacao):
     enviar_email(solicitacao.email, '[DISEC] Solicitação de acesso não aprovada', corpo)
 
 
+def email_boas_vindas(usuario, senha_temporaria):
+    """Envia e-mail de boas-vindas com credenciais ao usuário criado pelo admin."""
+    url_login = f"{_base_url()}/login"
+    corpo = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
+        <h2 style="color:#FCF000;margin:0;">Portal DISEC — Bem-vindo(a)!</h2>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border:1px solid #e0e0e0;border-radius:0 0 8px 8px;">
+        <p style="color:#333;">Olá, <strong>{usuario.nome}</strong>!</p>
+        <p style="color:#333;">Sua conta no <strong>Portal DISEC</strong> foi criada com sucesso.
+           Utilize as credenciais abaixo para acessar o sistema:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;width:140px;background:#f0f0f0;">Usuário:</td>
+            <td style="padding:10px;color:#333;background:#fff;font-family:monospace;">{usuario.username}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;background:#f0f0f0;">Senha temporária:</td>
+            <td style="padding:10px;color:#333;background:#fff;font-family:monospace;">{senha_temporaria}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px;font-weight:bold;color:#555;background:#f0f0f0;">Nível de acesso:</td>
+            <td style="padding:10px;color:#333;background:#fff;">{usuario.nivel}</td>
+          </tr>
+        </table>
+        <p style="color:#c0392b;font-size:0.9rem;">
+          ⚠️ Por segurança, altere sua senha após o primeiro acesso.
+        </p>
+        <a href="{url_login}" style="display:inline-block;background:#0038A8;color:#FCF000;
+           padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">
+          Acessar o Portal
+        </a>
+        <p style="color:#888;font-size:0.85rem;">Se você não esperava este e-mail, entre em contato com a equipe DISEC.</p>
+      </div>
+    </div>
+    """
+    enviar_email(usuario.email, '[DISEC] Suas credenciais de acesso', corpo)
+
+
 def calcular_eficiencia_energetica(consumo_energia, area_util):
     """Calcula eficiência energética mensal em kWh/m².
     Retorna round(consumo / area, 2) ou None se area_util for zero/None.
@@ -1397,6 +1437,10 @@ def api_usuarios_criar():
     u.set_senha(senha)
     db.session.add(u)
     db.session.commit()
+
+    # Envia e-mail com as credenciais de acesso
+    email_boas_vindas(u, senha)
+
     return jsonify(u.to_dict()), 201
 
 
