@@ -219,9 +219,30 @@
             console.warn('Não foi possível obter o limiar IDI; usando padrão 3.0', e);
         }
 
+        // Renderiza o mapa com os dados já carregados (se buscarAgencias já rodou)
+        if (window._agenciasCarregadas) {
+            renderMapa(window._agenciasCarregadas);
+        }
+    }
+
+    // Inicialização independente do Google Maps
+    async function inicializarPagina() {
+        // Busca o limiar IDI (se o Maps ainda não carregou)
+        if (!gMap) {
+            try {
+                const res = await fetch('/api/config/limiar-idi');
+                const data = await res.json();
+                if (data && data.limiar_idi != null) {
+                    gLimiarIDI = parseFloat(data.limiar_idi);
+                }
+            } catch (e) { /* usa padrão 3.0 */ }
+        }
+
         aplicarFiltroRapido();
         buscarAgencias();
     }
+
+    document.addEventListener('DOMContentLoaded', inicializarPagina);
 
     function limparMarcadores() {
         gMarkers.forEach(m => m.setMap(null));
@@ -318,6 +339,9 @@
             if (window._filtroIDICritico) {
                 agencias = agencias.filter(ag => ag.idi != null && ag.idi < gLimiarIDI);
             }
+
+            // Guarda para uso posterior pelo mapa (caso Maps ainda não tenha carregado)
+            window._agenciasCarregadas = agencias;
 
             renderTabela(agencias);
             renderMapa(agencias);
