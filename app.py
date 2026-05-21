@@ -271,42 +271,34 @@ def _smtp_config():
 
 
 def enviar_email(destinatario, assunto, corpo_html):
-    """Envia e-mail via SMTP. Retorna (True, None) em sucesso ou (False, mensagem_erro)."""
+    """Envia e-mail via SMTP. Retorna True em caso de sucesso."""
     cfg = _smtp_config()
     if not cfg['user'] or not cfg['password']:
-        msg = 'SMTP não configurado — variáveis SMTP_USER ou SMTP_PASSWORD ausentes.'
-        app.logger.warning(msg)
-        return False, msg
+        app.logger.warning('SMTP não configurado — e-mail não enviado.')
+        return False
     try:
-        msg_obj = MIMEMultipart('alternative')
-        msg_obj['Subject'] = assunto
-        msg_obj['From']    = cfg['from']
-        msg_obj['To']      = destinatario
-        msg_obj.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = assunto
+        msg['From']    = cfg['from']
+        msg['To']      = destinatario
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
 
         with smtplib.SMTP(cfg['host'], cfg['port'], timeout=15) as smtp:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(cfg['user'], cfg['password'])
-            smtp.sendmail(cfg['from'], [destinatario], msg_obj.as_string())
+            smtp.sendmail(cfg['from'], [destinatario], msg.as_string())
         app.logger.info(f'E-mail enviado com sucesso para {destinatario} — assunto: {assunto}')
-        return True, None
+        return True
     except smtplib.SMTPAuthenticationError as exc:
-        msg = f'Falha de autenticação SMTP: {exc}'
-        app.logger.error(f'{msg} (destinatário: {destinatario})')
-        return False, msg
+        app.logger.error(f'Falha de autenticação SMTP ao enviar para {destinatario}: {exc}')
+        return False
     except smtplib.SMTPRecipientsRefused as exc:
-        msg = f'Destinatário recusado pelo servidor SMTP: {exc}'
-        app.logger.error(f'{msg} ({destinatario})')
-        return False, msg
-    except smtplib.SMTPConnectError as exc:
-        msg = f'Não foi possível conectar ao servidor SMTP ({cfg["host"]}:{cfg["port"]}): {exc}'
-        app.logger.error(msg)
-        return False, msg
+        app.logger.error(f'Destinatário recusado pelo servidor SMTP ({destinatario}): {exc}')
+        return False
     except Exception as exc:
-        msg = f'{type(exc).__name__}: {exc}'
-        app.logger.error(f'Erro ao enviar e-mail para {destinatario}: {msg}')
-        return False, msg
+        app.logger.error(f'Erro ao enviar e-mail para {destinatario}: {exc}')
+        return False
 
 
 def _base_url():
@@ -348,7 +340,7 @@ def email_solicitacao_admin(solicitacao):
 
 
 def email_aprovacao(solicitacao, link_definir_senha):
-    """Envia link de definição de senha ao usuário aprovado. Retorna (ok, erro)."""
+    """Envia link de definição de senha ao usuário aprovado."""
     corpo = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
       <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
@@ -367,11 +359,11 @@ def email_aprovacao(solicitacao, link_definir_senha):
       </div>
     </div>
     """
-    return enviar_email(solicitacao.email, '[DISEC] Acesso aprovado — Crie sua senha', corpo)
+    enviar_email(solicitacao.email, '[DISEC] Acesso aprovado — Crie sua senha', corpo)
 
 
 def email_rejeicao(solicitacao):
-    """Notifica o usuário que a solicitação foi rejeitada. Retorna (ok, erro)."""
+    """Notifica o usuário que a solicitação foi rejeitada."""
     corpo = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
       <div style="background:#0038A8;padding:24px;border-radius:8px 8px 0 0;">
@@ -385,7 +377,7 @@ def email_rejeicao(solicitacao):
       </div>
     </div>
     """
-    return enviar_email(solicitacao.email, '[DISEC] Solicitação de acesso não aprovada', corpo)
+    enviar_email(solicitacao.email, '[DISEC] Solicitação de acesso não aprovada', corpo)
 
 
 def email_boas_vindas(usuario, senha_temporaria):
@@ -440,20 +432,17 @@ def calcular_eficiencia_energetica(consumo_energia, area_util):
 def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
     """Calcula IDI contínuo (1.0–5.0) ajustado pela zona bioclimática.
 
-    Fórmula (conforme NBR 15220):
-      efic_anual = (consumo_energia * 12) / area_util   [kWh/m²·ano]
-      ratio      = efic_anual / consumo_ref_zona
-
-    Se ratio >= 1.0 → agência acima do limite → IDI baixo (crítico).
-    Se ratio < 1.0  → agência dentro do limite → IDI alto (bom/excelente).
+    Fórmula:
+      efic_mensal = consumo_energia / area_util   [kWh/m²·mês]
+      ratio       = efic_mensal / consumo_ref_zona
 
     Mapeamento linear contínuo por faixa de ratio:
-      ratio <= 0.00    → IDI 5.0
-      ratio 0.00–0.60  → IDI 5.0–4.0  (linear)
-      ratio 0.60–0.75  → IDI 4.0–3.0  (linear)
-      ratio 0.75–0.90  → IDI 3.0–2.0  (linear)
-      ratio 0.90–1.00  → IDI 2.0–1.0  (linear)
-      ratio >= 1.00    → IDI 1.0
+      ratio <= 0.00  → IDI 5.0
+      ratio  0.00–0.60 → IDI 5.0–4.0  (linear)
+      ratio  0.60–0.75 → IDI 4.0–3.0  (linear)
+      ratio  0.75–0.90 → IDI 3.0–2.0  (linear)
+      ratio  0.90–1.00 → IDI 2.0–1.0  (linear)
+      ratio >= 1.00  → IDI 1.0
 
     Retorna None se faltar consumo, área ou zona.
     """
@@ -462,8 +451,8 @@ def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
     zona = ZONAS_BIOCLIMATICAS.get(zona_bioclimatica)
     if not zona:
         return None
-    efic_anual = (consumo_energia * 12) / area_util
-    ratio      = efic_anual / zona['consumo_ref']
+    efic_mensal = consumo_energia / area_util
+    ratio       = efic_mensal / zona['consumo_ref']
 
     if ratio >= 1.00:
         idi = 1.0
@@ -1617,10 +1606,10 @@ def api_solicitacao_aprovar(sol_id):
     sol.resolvido_em = datetime.utcnow()
     db.session.commit()
 
-    link             = f"{_base_url()}/definir-senha/{token}"
-    email_ok, email_erro = email_aprovacao(sol, link)
+    link         = f"{_base_url()}/definir-senha/{token}"
+    email_ok     = email_aprovacao(sol, link)
 
-    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok, 'email_erro': email_erro})
+    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok})
 
 
 @app.route('/api/solicitacoes/<int:sol_id>/rejeitar', methods=['POST'])
@@ -1655,10 +1644,10 @@ def api_solicitacao_reenviar(sol_id):
     sol.token_expira = datetime.utcnow() + timedelta(hours=24)
     db.session.commit()
 
-    link                 = f"{_base_url()}/definir-senha/{token}"
-    email_ok, email_erro = email_aprovacao(sol, link)
+    link         = f"{_base_url()}/definir-senha/{token}"
+    email_ok     = email_aprovacao(sol, link)
 
-    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok, 'email_erro': email_erro})
+    return jsonify({'ok': True, 'link': link, 'email_enviado': email_ok})
 
 
 @app.errorhandler(403)
