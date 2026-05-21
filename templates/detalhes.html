@@ -198,9 +198,8 @@
                 {% set efic_mensal = agencia.eficiencia_energetica if agencia.eficiencia_energetica is not none
                                      else ((agencia.consumo_energia / agencia.area_util) | round(2)
                                            if agencia.consumo_energia and agencia.area_util else none) %}
-                {% set efic_anual  = (efic_mensal * 12) | round(1) if efic_mensal is not none else none %}
                 {% set limite_zona = agencia.zona_bioclimatica_consumo_ref %}
-                {% set acima_limite = (efic_anual is not none and limite_zona is not none and efic_anual > limite_zona) %}
+                {% set acima_limite = (efic_mensal is not none and limite_zona is not none and efic_mensal > limite_zona) %}
 
                 {# ── Banner de alerta quando acima do limite ──────────────────────── #}
                 {% if acima_limite %}
@@ -209,10 +208,10 @@
                     <div class="efic-alerta-body">
                         <strong>Consumo acima do limite da Zona {{ agencia.zona_bioclimatica }}</strong>
                         <span>
-                            Eficiência anual: <strong>{{ efic_anual }} kWh/m²·ano</strong>
-                            — Limite NBR 15220: <strong>{{ limite_zona }} kWh/m²·ano</strong>
+                            Eficiência mensal: <strong>{{ efic_mensal }} kWh/m²/mês</strong>
+                            — Limite NBR 15220: <strong>{{ limite_zona }} kWh/m²/mês</strong>
                             <span class="efic-alerta-excesso">
-                                (+{{ ((efic_anual - limite_zona) / limite_zona * 100) | round(1) }}% acima)
+                                (+{{ ((efic_mensal - limite_zona) / limite_zona * 100) | round(1) }}% acima)
                             </span>
                         </span>
                     </div>
@@ -238,16 +237,13 @@
                                 <i class="fas {% if acima_limite %}fa-arrow-up{% else %}fa-check{% endif %}"></i>
                                 {{ efic_mensal }} kWh/m²<small>/mês</small>
                             </span>
-                            {% if efic_anual is not none %}
+                            {% if limite_zona is not none %}
                             <small class="text-muted" style="display:block;margin-top:2px;">
-                                ≈ {{ efic_anual }} kWh/m²·ano
-                                {% if limite_zona %}
-                                · Limite zona: {{ limite_zona }} kWh/m²·ano
+                                Limite zona: {{ limite_zona }} kWh/m²/mês
                                 {% if acima_limite %}
                                 <span style="color:#E11D48;font-weight:700;">⚠ Acima</span>
                                 {% else %}
                                 <span style="color:#16a34a;font-weight:700;">✓ Dentro</span>
-                                {% endif %}
                                 {% endif %}
                             </small>
                             {% endif %}
@@ -264,7 +260,7 @@
                             — {{ agencia.zona_bioclimatica_descricao }}
                             <br>
                             <small class="text-muted">
-                                Consumo máx. referência: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
+                                Consumo máx. referência: {{ limite_zona }} kWh/m²/mês
                             </small>
                             {% else %}
                             <em class="text-muted">Não informada</em>
@@ -284,12 +280,10 @@
                                 {% elif agencia.idi < 5 %}Bom
                                 {% else %}Excelente{% endif %}
                             </small>
-                            {% if agencia.eficiencia_energetica is not none %}
+                            {% if efic_mensal is not none and limite_zona is not none %}
                             <br><small class="text-muted" style="font-size:.78rem;">
-                                Eficiência: {{ (agencia.eficiencia_energetica * 12) | round(1) }} kWh/m²·ano
-                                {% if agencia.zona_bioclimatica_consumo_ref %}
-                                · Limite zona: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
-                                {% endif %}
+                                Eficiência: {{ efic_mensal }} kWh/m²/mês
+                                · Limite zona: {{ limite_zona }} kWh/m²/mês
                             </small>
                             {% endif %}
                             {% else %}

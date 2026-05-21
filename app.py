@@ -433,8 +433,8 @@ def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
     """Calcula IDI contínuo (1.0–5.0) ajustado pela zona bioclimática.
 
     Fórmula:
-      efic_anual = (consumo_energia * 12) / area_util   [kWh/m²·ano]
-      ratio      = efic_anual / consumo_ref_zona
+      efic_mensal = consumo_energia / area_util   [kWh/m²·mês]
+      ratio       = efic_mensal / consumo_ref_zona
 
     Mapeamento linear contínuo por faixa de ratio:
       ratio <= 0.00  → IDI 5.0
@@ -451,8 +451,8 @@ def calcular_idi_por_zona(consumo_energia, area_util, zona_bioclimatica):
     zona = ZONAS_BIOCLIMATICAS.get(zona_bioclimatica)
     if not zona:
         return None
-    efic_anual = (consumo_energia * 12) / area_util
-    ratio      = efic_anual / zona['consumo_ref']
+    efic_mensal = consumo_energia / area_util
+    ratio       = efic_mensal / zona['consumo_ref']
 
     if ratio >= 1.00:
         idi = 1.0
