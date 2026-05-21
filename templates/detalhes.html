@@ -286,7 +286,7 @@
                             </small>
                             {% if agencia.eficiencia_energetica is not none %}
                             <br><small class="text-muted" style="font-size:.78rem;">
-                                Eficiência: {{ agencia.eficiencia_energetica }} kWh/m²
+                                Eficiência: {{ (agencia.eficiencia_energetica * 12) | round(1) }} kWh/m²·ano
                                 {% if agencia.zona_bioclimatica_consumo_ref %}
                                 · Limite zona: {{ agencia.zona_bioclimatica_consumo_ref }} kWh/m²·ano
                                 {% endif %}
@@ -698,7 +698,7 @@
                            value="{{ agencia.area_util or '' }}">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
+                    <label class="form-label">Eficiência Energética (kWh/m²·mês)</label>
                     <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
                         <span>
