@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Agência {{ agencia.prefixo }} | Portal DISEC{% endblock %}
+{% block title %}Informações — Agência {{ agencia.prefixo }} | Portal DISEC{% endblock %}
 
 {% block content %}
 <div class="detalhes-wrapper">
@@ -42,7 +42,7 @@
                 <i class="fas fa-edit"></i> Editar Dados
             </button>
             {% endif %}
-            <a href="{{ url_for('agencias') }}" class="btn btn-primary">
+            <a href="{{ url_for('detalhes_index') }}" class="btn btn-primary">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
         </div>
@@ -73,12 +73,32 @@
             </h4>
         </div>
         <div class="status-card esg" id="card-idi">
-            <p>IDI</p>
+            <p>IDI
+                {% if agencia.zona_bioclimatica %}
+                <span style="font-size:.68rem;font-weight:600;opacity:.7;margin-left:4px;">
+                    · Zona {{ agencia.zona_bioclimatica }}
+                </span>
+                {% endif %}
+            </p>
             <h4 id="idi-valor">
-                {% if agencia.idi is not none and agencia.idi is not none %}
-                {{ agencia.idi }}
-                {% else %}IDI não informado{% endif %}
+                {% if agencia.idi is not none %}
+                <span style="color:{% if agencia.idi < 2 %}#E11D48{% elif agencia.idi < 3 %}#f59e0b{% elif agencia.idi < 4 %}#eab308{% else %}#16a34a{% endif %};">
+                    {{ agencia.idi }}
+                </span>
+                <small style="font-size:.65rem;font-weight:500;display:block;margin-top:2px;">
+                    {% if agencia.idi < 2 %}Crítico
+                    {% elif agencia.idi < 3 %}Alerta
+                    {% elif agencia.idi < 4 %}Tolerável
+                    {% elif agencia.idi < 5 %}Bom
+                    {% else %}Excelente{% endif %}
+                </small>
+                {% else %}Não informado{% endif %}
             </h4>
+            {% if agencia.zona_bioclimatica %}
+            <small style="font-size:.72rem;opacity:.75;">
+                {{ agencia.zona_bioclimatica_descricao }}
+            </small>
+            {% endif %}
         </div>
     </div>
 
@@ -174,14 +194,98 @@
                 </p>
                 {% endif %}
 
+                {# ── Cálculo de alerta de eficiência energética ──────────────────── #}
+                {% set efic_mensal = agencia.eficiencia_energetica if agencia.eficiencia_energetica is not none
+                                     else ((agencia.consumo_energia / agencia.area_util) | round(2)
+                                           if agencia.consumo_energia and agencia.area_util else none) %}
+                {% set limite_zona = agencia.zona_bioclimatica_consumo_ref %}
+                {% set acima_limite = (efic_mensal is not none and limite_zona is not none and efic_mensal > limite_zona) %}
+
+                {# ── Banner de alerta quando acima do limite ──────────────────────── #}
+                {% if acima_limite %}
+                <div class="efic-alerta-banner" role="alert">
+                    <div class="efic-alerta-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="efic-alerta-body">
+                        <strong>Consumo acima do limite da Zona {{ agencia.zona_bioclimatica }}</strong>
+                        <span>
+                            Eficiência mensal: <strong>{{ efic_mensal }} kWh/m²/mês</strong>
+                            — Limite NBR 15220: <strong>{{ limite_zona }} kWh/m²/mês</strong>
+                            <span class="efic-alerta-excesso">
+                                (+{{ ((efic_mensal - limite_zona) / limite_zona * 100) | round(1) }}% acima)
+                            </span>
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
                 <table class="info-table" style="margin-bottom:16px;">
+                    <tr>
+                        <td><i class="fas fa-ruler-combined"></i> Área Útil:</td>
+                        <td>
+                            {% if agencia.area_util is not none %}
+                            {{ agencia.area_util | round(2) | string | replace('.0', '') }} m²
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
                     <tr>
                         <td><i class="fas fa-plug"></i> Eficiência Energética:</td>
                         <td>
-                            {% if agencia.eficiencia_energetica is not none %}
-                            {{ agencia.eficiencia_energetica }} kWh/m²
-                            {% elif agencia.consumo_energia and agencia.area_util %}
-                            {{ (agencia.consumo_energia / agencia.area_util) | round(2) }} kWh/m²
+                            {% if efic_mensal is not none %}
+                            <span class="efic-valor {% if acima_limite %}efic-acima{% else %}efic-ok{% endif %}">
+                                <i class="fas {% if acima_limite %}fa-arrow-up{% else %}fa-check{% endif %}"></i>
+                                {{ efic_mensal }} kWh/m²<small>/mês</small>
+                            </span>
+                            {% if limite_zona is not none %}
+                            <small class="text-muted" style="display:block;margin-top:2px;">
+                                Limite zona: {{ limite_zona }} kWh/m²/mês
+                                {% if acima_limite %}
+                                <span style="color:#E11D48;font-weight:700;">⚠ Acima</span>
+                                {% else %}
+                                <span style="color:#16a34a;font-weight:700;">✓ Dentro</span>
+                                {% endif %}
+                            </small>
+                            {% endif %}
+                            {% else %}
+                            <em class="text-muted">Não informado</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-sun"></i> Zona Bioclimática:</td>
+                        <td>
+                            {% if agencia.zona_bioclimatica %}
+                            <strong>Zona {{ agencia.zona_bioclimatica }}</strong>
+                            — {{ agencia.zona_bioclimatica_descricao }}
+                            <br>
+                            <small class="text-muted">
+                                Consumo máx. referência: {{ limite_zona }} kWh/m²/mês
+                            </small>
+                            {% else %}
+                            <em class="text-muted">Não informada</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-tachometer-alt"></i> IDI:</td>
+                        <td>
+                            {% if agencia.idi is not none %}
+                            {% set idi_color = '#E11D48' if agencia.idi < 2 else ('#f59e0b' if agencia.idi < 3 else ('#eab308' if agencia.idi < 4 else '#16a34a')) %}
+                            <strong style="color:{{ idi_color }};">{{ agencia.idi }}</strong>
+                            <small class="text-muted" style="margin-left:6px;">
+                                — {% if agencia.idi < 2 %}Crítico (acima do limite da zona)
+                                {% elif agencia.idi < 3 %}Alerta (próximo do limite)
+                                {% elif agencia.idi < 4 %}Tolerável
+                                {% elif agencia.idi < 5 %}Bom
+                                {% else %}Excelente{% endif %}
+                            </small>
+                            {% if efic_mensal is not none and limite_zona is not none %}
+                            <br><small class="text-muted" style="font-size:.78rem;">
+                                Eficiência: {{ efic_mensal }} kWh/m²/mês
+                                · Limite zona: {{ limite_zona }} kWh/m²/mês
+                            </small>
+                            {% endif %}
                             {% else %}
                             <em class="text-muted">Não informado</em>
                             {% endif %}
@@ -588,9 +692,14 @@
                            value="{{ agencia.area_util or '' }}">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Eficiência Energética (kWh/m²)</label>
-                    <input type="number" step="any" class="form-input" id="edit-eficiencia"
-                           value="{{ agencia.eficiencia_energetica or '' }}">
+                    <label class="form-label">Eficiência Energética (kWh/m²·mês)</label>
+                    <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
+                        <span>
+                            {% if agencia.eficiencia_energetica is not none %}{{ agencia.eficiencia_energetica }}{% else %}—{% endif %}
+                            <small style="font-size:.75rem;"> (calculado)</small>
+                        </span>
+                    </div>
                 </div>
             </div>
             <div class="form-grid cols-2" style="margin-bottom:16px;">
@@ -607,10 +716,31 @@
             </div>
             <div class="form-grid cols-2" style="margin-bottom:16px;">
                 <div class="form-group">
-                    <label class="form-label">IDI (1,0 – 10,0)</label>
-                    <input type="number" step="0.1" min="1" max="10" class="form-input" id="edit-idi"
-                           value="{{ agencia.idi or '' }}">
+                    <label class="form-label"><i class="fas fa-sun"></i> Zona Bioclimática (NBR 15220)</label>
+                    <select class="form-input" id="edit-zona-bioclimatica">
+                        <option value="">— Não informada —</option>
+                        <option value="1" {% if agencia.zona_bioclimatica == 1 %}selected{% endif %}>Zona 1 — Norte úmido (Manaus, Belém) · ref. 120 kWh/m²·ano</option>
+                        <option value="2" {% if agencia.zona_bioclimatica == 2 %}selected{% endif %}>Zona 2 — Nordeste litorâneo · ref. 110 kWh/m²·ano</option>
+                        <option value="3" {% if agencia.zona_bioclimatica == 3 %}selected{% endif %}>Zona 3 — Semiárido (Petrolina) · ref. 100 kWh/m²·ano</option>
+                        <option value="4" {% if agencia.zona_bioclimatica == 4 %}selected{% endif %}>Zona 4 — Centro-Oeste (Brasília, Goiânia) · ref. 95 kWh/m²·ano</option>
+                        <option value="5" {% if agencia.zona_bioclimatica == 5 %}selected{% endif %}>Zona 5 — Sudeste quente (SP interior) · ref. 90 kWh/m²·ano</option>
+                        <option value="6" {% if agencia.zona_bioclimatica == 6 %}selected{% endif %}>Zona 6 — Sul subtropical (Curitiba) · ref. 85 kWh/m²·ano</option>
+                        <option value="7" {% if agencia.zona_bioclimatica == 7 %}selected{% endif %}>Zona 7 — Sul temperado (Porto Alegre) · ref. 80 kWh/m²·ano</option>
+                        <option value="8" {% if agencia.zona_bioclimatica == 8 %}selected{% endif %}>Zona 8 — Serra Gaúcha / frio intenso · ref. 75 kWh/m²·ano</option>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">IDI</label>
+                    <div class="form-input" style="background:#f8fafc;color:var(--text-muted);cursor:default;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-calculator" style="color:var(--bb-blue);"></i>
+                        <span>
+                            {% if agencia.idi is not none %}{{ agencia.idi }}{% else %}—{% endif %}
+                            <small style="font-size:.75rem;"> (calculado automaticamente)</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-grid cols-2" style="margin-bottom:16px;">
                 <div class="form-group">
                     <label class="form-label">Classificação BACEN</label>
                     <select class="form-input" id="edit-classificacao-bacen">
@@ -675,10 +805,9 @@ async function salvarEdicao(e) {
         consumo_energia: document.getElementById('edit-energia').value || null,
         consumo_agua:    document.getElementById('edit-agua').value    || null,
         area_util:            document.getElementById('edit-area-util').value || null,
-        eficiencia_energetica: document.getElementById('edit-eficiencia').value || null,
         residuos_solidos:     document.getElementById('edit-residuos').value || null,
         num_colaboradores:    document.getElementById('edit-colaboradores').value || null,
-        idi:                  document.getElementById('edit-idi').value || null,
+        zona_bioclimatica:    document.getElementById('edit-zona-bioclimatica').value || null,
         classificacao_bacen:  document.getElementById('edit-classificacao-bacen').value || null,
         email_agencia:        document.getElementById('edit-email-agencia').value.trim() || null,
         cnpj:                 document.getElementById('edit-cnpj').value.trim() || null,
@@ -744,13 +873,76 @@ async function salvarEdicao(e) {
         iw.open(miniMap, marker);
     }
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
         async defer></script>
 {% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
+/* ── Alerta de eficiência energética ─────────────────────────────── */
+.efic-alerta-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #fff7ed;
+    border: 1.5px solid #f97316;
+    border-left: 5px solid #f97316;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    animation: efic-pulse 2.5s ease-in-out infinite;
+}
+@keyframes efic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,.0); }
+    50%       { box-shadow: 0 0 0 4px rgba(249,115,22,.18); }
+}
+.efic-alerta-icon {
+    font-size: 1.25rem;
+    color: #f97316;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.efic-alerta-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: .85rem;
+    color: #7c2d12;
+    line-height: 1.5;
+}
+.efic-alerta-body strong { color: #c2410c; }
+.efic-alerta-excesso {
+    display: inline-block;
+    background: #fed7aa;
+    color: #9a3412;
+    font-weight: 700;
+    font-size: .78rem;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+
+/* ── Indicador inline de eficiência ──────────────────────────────── */
+.efic-valor {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    font-size: .9rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.efic-valor small { font-weight: 400; font-size: .75rem; margin-left: 1px; }
+.efic-acima {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.efic-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
 .detalhes-search-bar {
     position: relative;
     margin-bottom: 24px;
@@ -1214,9 +1406,13 @@ async function carregarVistoria() {
             ? new Date(v.data_validade + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
         if (v.vencida) {
             document.getElementById('vistoria-badge-vencida').style.display = 'inline-block';
+        } else {
+            document.getElementById('vistoria-badge-vencida').style.display = 'none';
         }
         if (v.nome_original) {
             document.getElementById('btn-download-vistoria').style.display = 'inline-flex';
+        } else {
+            document.getElementById('btn-download-vistoria').style.display = 'none';
         }
     } catch(e) {
         loading.textContent = 'Erro ao carregar vistoria.';
@@ -1330,7 +1526,7 @@ document.addEventListener('DOMContentLoaded', function() {
         iw.open(miniMap, marker);
     }
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMiniMap&loading=async"
+<script src="https://maps.googleapis.com/maps/api/js?v=3.56&key={{ google_maps_key }}&callback=initMiniMap&loading=async"
         async defer></script>
 {% endif %}
 {% endblock %}

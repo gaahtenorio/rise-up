@@ -10,8 +10,6 @@ function initMap() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
     }).addTo(map);
-
-    console.log("Mapa inicializado com sucesso!");
 }
 
 /**
